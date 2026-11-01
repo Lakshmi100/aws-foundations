@@ -1,0 +1,13 @@
+.DS_Store
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!example.tfvars
+crash.log
+
+# Local secrets
+.env
