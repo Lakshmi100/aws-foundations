@@ -31,8 +31,8 @@ applicable (the story reviewer scores these under C4):
 - **No IAM users or long-lived keys** in any account.
 - **Cost:** monthly cost of what the story adds. Resources here persist, so
   anything billed by the hour needs a reason.
-- **Tagging:** taggable resources carry `data-product`, `environment`,
-  `owner`, `cost-center`.
+- **Tagging:** taggable resources carry the four cost tags, with the values
+  under "Coding standards".
 - **Audit:** effect on the organization CloudTrail trail and its log bucket.
 - **Effect on member accounts:** which accounts and existing roles the change
   reaches (ABC Bank, Offers Platform).
@@ -71,7 +71,9 @@ Not set up yet. The first story must add a `Makefile` with:
 Test framework and locations: acceptance checks are AWS CLI or Terraform
 commands run against the real accounts, written as scripts in `tests/`
 (one script per story, named by story key, e.g. `tests/FND-1.sh`), each
-printing PASS or FAIL per acceptance criterion.
+printing PASS or FAIL per acceptance criterion. A criterion only a person can
+check (for example, "the alert email arrived") prints MANUAL with what to
+check; the evidence goes in the PR.
 
 **Everything here is real AWS.** Tests read state; they never create
 resources except where an acceptance criterion says so (for example, a test
@@ -83,9 +85,12 @@ create.
 - Terraform: `terraform fmt`; region `us-east-1`; variables and outputs
   documented; no hard-coded account IDs except in variables; providers
   pinned to a version range.
+- Cost tags and their values: `data-product = aws-foundations`,
+  `environment = shared`, `owner = Lakshmi100`,
+  `cost-center = offers-platform-portfolio`.
 - Account email addresses, alert email addresses and other personal details
   go in an untracked `.tfvars` file; an `example.tfvars` shows the shape.
-- Shell test scripts use `set -euo pipefail` and print one PASS/FAIL line per
+- Shell test scripts use `set -euo pipefail` and print one PASS, FAIL or MANUAL line per
   acceptance criterion.
 
 ## Definition of done (additions)
