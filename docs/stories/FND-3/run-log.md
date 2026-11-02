@@ -16,3 +16,5 @@
 2026-11-02T01:56:41Z | approval | end | round 1: feedback applied; design rev 2, test plan 73 cases; new decisions back to gate
 2026-11-02T01:56:41Z | approval | start | round 2
 2026-11-02T02:07:58Z | approval | end | round 2: approved
+2026-11-02T02:07:58Z | tests | start | tester automate
+2026-11-02T02:25:54Z | tests | end | tests/FND-3.sh 19 lines all FAIL (nothing applied yet); selftest 53/53 PASS; no existing tests
