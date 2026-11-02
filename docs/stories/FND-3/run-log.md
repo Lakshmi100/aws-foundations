@@ -18,3 +18,8 @@
 2026-11-02T02:07:58Z | approval | end | round 2: approved
 2026-11-02T02:07:58Z | tests | start | tester automate
 2026-11-02T02:25:54Z | tests | end | tests/FND-3.sh 19 lines all FAIL (nothing applied yet); selftest 53/53 PASS; no existing tests
+2026-11-02T02:25:54Z | implementation | start |
+2026-11-02T02:43:41Z | implementation | escalation | 3: ABC Bank boundary 6097/6144 chars; TC49 same-account AssumeRole simulation vs no explicit deny; added offers_platform_account_email variable. lint/test/selftest pass; uncommitted
+2026-11-02T02:53:05Z | implementation | escalation-resolved | owner: accept ABC boundary size (ABC-6 decides fallback); explicit sts:AssumeRole deny on OAAR for Offers Platform; extra email variable accepted
+2026-11-02T03:04:52Z | story | updated | owner asked: AC6, AC7, AC14 updated in issue #3 to match gate decisions; decisions comment posted; story.md re-synced
+2026-11-02T03:04:52Z | implementation | end | sts:AssumeRole deny added (B-OP 3802 chars); lint/test/selftest pass

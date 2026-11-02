@@ -15,3 +15,9 @@ The owner approved the decisions added while applying round 1 (design revision 2
 3. Owner takes the read-only Offers Platform baseline before the invitation, stored outside the repo (D7).
 4. `tests/FND-3.sh` prints `REG-TC67` and `REG-TC68` after the 17 AC lines; either can fail the run.
 5. TC69, TC70 and TC71 have no output line; they are reported as PR evidence.
+
+# Implementation escalations (owner decisions)
+
+1. **ABC Bank boundary size (6,097 of 6,144 characters):** a permissions boundary is a single managed policy and cannot be split. Accept it as is for FND-3; ABC-6 must choose a fallback (for example exact-match action wildcards) before it adds permissions to the ABC Bank engineering role.
+2. **Recovery role (TC49, AC10):** add an explicit deny on `sts:AssumeRole` for `role/OrganizationAccountAccessRole` to the Offers Platform engineering role, and so to the Offers Platform boundary (the cap is built from the same statements). Not needed in ABC Bank: that role grants no `sts` actions. TC49 stays as approved.
+3. **`offers_platform_account_email` variable:** accepted (the account resource requires an email).
