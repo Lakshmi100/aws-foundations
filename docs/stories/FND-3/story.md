@@ -21,7 +21,7 @@ Roadmap decision: three accounts, "Management + Shared Services" (new), "ABC Ban
 ## Requirements
 
 1. **Organization:** an AWS Organization with **all features** enabled (required by Identity Center and by FND-4 (#4)'s organization trail), with the Management + Shared Services account as its management account and consolidated billing.
-2. **Accounts:** the ABC Bank account is created in the organization; the existing Offers Platform account is invited and joins it.
+2. **Accounts:** the ABC Bank account is created in the organization; the existing Offers Platform account is invited and joins it. That account is today the management account of its own one-account organization (created Feb 12, 2026; no other accounts, OUs, delegated administrators or organization trail), which AWS must delete before the account can accept an invitation.
 3. **Sign-in:** IAM Identity Center is enabled with one user for the engineer. MFA is required **at every sign-in**, using an authenticator app or security key.
 4. **Roles (Identity Center permission sets):**
    - **Administrator**, in each of the three accounts: for setup, recovery and applying long-lived foundations (ABC-3 (Lakshmi100/abc-bank#3), ABC-4 (Lakshmi100/abc-bank#4), ABC-5 (Lakshmi100/abc-bank#5) and FND-4 (#4)). Not for day-to-day work.
@@ -44,7 +44,7 @@ Roadmap decision: three accounts, "Management + Shared Services" (new), "ABC Ban
    - member accounts: from the management account's administrator role, assume `OrganizationAccountAccessRole` in each member account. AWS creates it in accounts made inside the organization; for the invited Offers Platform account it is created by this story.
    - The steps are written in `README.md`. Root users of the member accounts have MFA and no access keys.
 8. **Organization services for later stories:** CloudTrail trusted access is enabled (FND-4 (#4)'s organization trail), and **Cost Explorer is enabled** in the management account (FND-4 (#4)'s cost-allocation tags; ABC-6 (Lakshmi100/abc-bank#6)'s cost check).
-9. **Manual steps:** everything is defined in Terraform in `aws-foundations`, except steps AWS only allows by hand. `README.md` lists them for the owner: signing up the management account and setting its root MFA; enabling Identity Center and its MFA setting, if the API doesn't allow it; accepting the invitation from inside the Offers Platform account; enabling Cost Explorer; setting MFA on the member accounts' root users.
+9. **Manual steps:** everything is defined in Terraform in `aws-foundations`, except steps AWS only allows by hand. `README.md` lists them for the owner: signing up the management account and setting its root MFA; enabling Identity Center and its MFA setting, if the API doesn't allow it; deleting the Offers Platform account's existing one-account organization from inside that account, just before the invitation is sent; accepting the invitation from inside the Offers Platform account; enabling Cost Explorer; setting MFA on the member accounts' root users.
 10. **State:** Terraform state for `aws-foundations` is stored in S3 in the management account, with locking and version history, created by `bootstrap/`. The bootstrap's own state is moved into that bucket once it exists. The bucket is never public, refuses requests without TLS, is encrypted at rest, and only the management account's administrator role (and its root user, for recovery) can read or write it.
 
 ## Constraints
@@ -58,7 +58,7 @@ Roadmap decision: three accounts, "Management + Shared Services" (new), "ABC Ban
 | Cost | Long-lived. The only billable resource is the state bucket, under $0.50 per month. Organizations, Identity Center and the role assignments are free. |
 | Tagging | Taggable resources carry the four cost tags with the values in `AGENTS.md`. |
 | Audit | No organization trail yet (FND-4 (#4)). Trusted access for CloudTrail is enabled here (requirement 8). |
-| Effect on member accounts | **Offers Platform:** billing moves to the management account; AWS's default "allow everything" service control policy is attached, so nothing is restricted; its IAM users and keys are inventoried but not changed, and its existing v1/v2 IAM roles are not changed (requirement 6); `OrganizationAccountAccessRole`, the fresh engineering role and the permissions boundary are added. **ABC Bank:** created new. |
+| Effect on member accounts | **Offers Platform:** its existing one-account organization is deleted first (nothing in it is used; its IAM users, roles, data and budget are account-level and stay); billing moves to the management account; AWS's default "allow everything" service control policy is attached, so nothing is restricted; its IAM users and keys are inventoried but not changed, and its existing v1/v2 IAM roles are not changed (requirement 6); `OrganizationAccountAccessRole`, the fresh engineering role and the permissions boundary are added. **ABC Bank:** created new. |
 | Region | Identity Center and Terraform use `us-east-1`. |
 
 ## Acceptance criteria
@@ -110,11 +110,13 @@ Every criterion runs against the real accounts. Checks that something is denied 
 - Nov 1, 2026 (after story review round 1): the Offers Platform account gets fresh IAM roles for new work; `customer-spend-analytics` (v1/v2) is not reused or changed. Its IAM users and keys are only inventoried here; removing them is a later story.
 - Nov 1, 2026 (after story review round 1): the permissions boundary is capped to the creating engineering role's own permissions. The ABC Bank KMS key's alias is `abc-bank-kms-key` and the ABC Bank state bucket is `abc-bank-offers-platform`; the name was checked as free on Nov 1, 2026, but S3 names are global, so ABC-3 confirms it when it creates the bucket; ABC-4 (Lakshmi100/abc-bank#4) and ABC-3 (Lakshmi100/abc-bank#3) create them under these names. The Offers Platform engineering role gets IAM read-only access, may change policies on bounded roles, and keeps billing and cost reads. The manual steps in requirement 9 are checked by the owner by hand; they have no acceptance criterion.
 - Nov 2, 2026 (design gate): AC6 and AC7 add the extra allowed and denied checks; AC14 covers all three accounts, the Identity Center instance and the permission sets. Full record: `docs/stories/FND-3/design-feedback.md`.
+- Nov 3, 2026 (during setup): the Offers Platform account turned out to be the management account of its own one-account organization. The owner chose to delete that organization (a manual step, requirement 9) and invite the account as planned, rather than make it the management account.
 - **Proposed defaults, for the approver to confirm:** MFA at every sign-in with an authenticator app or security key.
 
 ## Open questions
 
 None.
+
 
 
 

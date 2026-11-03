@@ -21,3 +21,9 @@ The owner approved the decisions added while applying round 1 (design revision 2
 1. **ABC Bank boundary size (6,097 of 6,144 characters):** a permissions boundary is a single managed policy and cannot be split. Accept it as is for FND-3; ABC-6 must choose a fallback (for example exact-match action wildcards) before it adds permissions to the ABC Bank engineering role.
 2. **Recovery role (TC49, AC10):** add an explicit deny on `sts:AssumeRole` for `role/OrganizationAccountAccessRole` to the Offers Platform engineering role, and so to the Offers Platform boundary (the cap is built from the same statements). Not needed in ABC Bank: that role grants no `sts` actions. TC49 stays as approved.
 3. **`offers_platform_account_email` variable:** accepted (the account resource requires an email).
+
+# Setup finding (owner decision, Nov 3, 2026)
+
+During setup step 0 the existing Offers Platform account turned out to be the management account of its own one-account organization (`FeatureSet: ALL`; only that account; no OUs, delegated administrators, organization trail or SCP policy type enabled; trusted access only for `sso.amazonaws.com`; no Identity Center instance). AWS does not let a management account accept an invitation.
+
+Decision: delete that organization from inside the Offers Platform account (owner, by hand, `aws organizations delete-organization`) just before the invitation is sent, then invite as planned. The story, design and code otherwise stay as they are. Rejected: making the Offers Platform account the management account (conflicts with the roadmap's dedicated management account and would put the v1/v2 workload where SCPs never apply). Issue #3 requirements 2 and 9, the "Effect on member accounts" constraint and the Decisions section were updated.

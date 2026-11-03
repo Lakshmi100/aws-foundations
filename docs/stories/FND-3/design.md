@@ -12,6 +12,12 @@ Revision 3: updated for the owner's decisions on the implementation escalations 
   - the README gives explicit `-target` sets for setup steps 3 and 5. Until the member-account profiles work, the member provider profiles are pointed at `fnd-management-admin` through `TF_VAR_*` (3.8);
   - setup step 1 adds "IAM user and role access to Billing information" in the management account (3.8).
 
+Revision 4: updated for the owner's setup finding (`design-feedback.md`, "Setup finding", Nov 3, 2026; story requirements 2 and 9). The Offers Platform account is the management account of its own one-account organization, which must be deleted before it can accept the invitation:
+- new owner manual step 3a in 3.8 (confirm, delete, confirm deleted), before the invitation, which is now step 3b; the sequence diagram (section 7) matches;
+- the section 5 risk row "Offers Platform in another organization" is replaced by this concrete case;
+- new decision D9 (section 8).
+No change to the Terraform contract, the tests or the policies.
+
 ## 1. Analysis
 
 The story builds the organization (all features, consolidated billing). It creates the ABC Bank account, brings in the existing Offers Platform account by invitation, and sets up Identity Center sign-in with MFA for one engineer. It adds five permission set assignments (Administrator in all three accounts, plus one engineering role in each member account) and a permissions boundary in each member account, capped to that account's engineering role. It also creates `OrganizationAccountAccessRole` in the invited account, turns on CloudTrail trusted access and Cost Explorer, sets up S3 state with locking, and adds a `README.md` with the manual steps, recovery steps and the Offers Platform IAM inventory.
@@ -210,7 +216,7 @@ Neither target needs AWS credentials.
 
 ### 3.8 First-apply order and teardown (README "Setup")
 
-0. **Owner, before step 3 sends the invitation, inside Offers Platform: pre-apply baseline (D7).**
+0. **Owner, before step 3b sends the invitation, inside Offers Platform: pre-apply baseline (D7).**
    - Who: the owner, using the existing Offers Platform credentials they use today. Read-only calls only; nothing is created or changed. Not root.
    - Where: `${FND3_BASELINE_DIR:-$HOME/.fnd-3-baseline}`, a directory **outside the repo working tree**. It is never committed, because it holds full key IDs, ARNs and the account ID, and the repo is public. The README gives the commands but never the output.
    - What, one JSON file each:
@@ -233,7 +239,19 @@ Neither target needs AWS credentials.
    - Apply with the explicit `-target` set the README lists for this step (the ABC Bank account, then the Identity Center resources). This apply also adds the four tags to the management account and the imported `Administrator` permission set.
    - Until the member-account profiles work (they need the member Administrator assignments to exist), set `TF_VAR_abc_bank_admin_profile=fnd-management-admin` and `TF_VAR_offers_platform_admin_profile=fnd-management-admin` so the member provider aliases can initialise (revision 3, accepted deviation). The `-target` sets contain no member-account resources; if a plan reaches one, the account-ID precondition (3.3) fails it.
    - Tag the Identity Center instance with the `aws sso-admin tag-resource` command in 3.3. Check it with `aws sso-admin list-tags-for-resource`.
-   - Send the invitation with `aws organizations invite-account-to-organization` (Terraform has no invitation resource).
+
+   3a. **Owner, by hand, inside Offers Platform, with the existing Offers Platform credentials (not root, not an `fnd-*` profile): delete its one-account organization (revision 4, D9).** Done just before 3b, after step 0's baseline.
+   - Confirm the account: `aws sts get-caller-identity` shows the Offers Platform account ID (never the new management account).
+   - Confirm the organization holds only itself:
+     - `aws organizations describe-organization`: `MasterAccountId` equals the Offers Platform account ID;
+     - `aws organizations list-accounts`: exactly one account, the Offers Platform account;
+     - `aws organizations list-delegated-administrators`: empty.
+   - **If `list-accounts` shows any other account, or any delegated administrator exists, or `MasterAccountId` is not the Offers Platform account: stop and ask the human.** Do not remove accounts, deregister administrators or delete anything.
+   - Delete: `aws organizations delete-organization`.
+   - Confirm deleted: `aws organizations describe-organization` now fails with `AWSOrganizationsNotInUseException`. If it returns an organization, stop and ask.
+   - The README records only the outcome (command run, exception seen), never the organization ID or account ID.
+
+   3b. **Admin profile:** send the invitation with `aws organizations invite-account-to-organization` (Terraform has no invitation resource).
 4. **Owner, inside Offers Platform:** accept the invitation.
 5. **Admin profile:** import `aws_organizations_account.offers_platform`, then apply the explicit `-target` set the README lists for this step, with the same `TF_VAR_*` overrides while the member profiles do not work yet. Once `fnd-abc-bank-admin` and `fnd-offers-platform-admin` sign in, unset the overrides and run a full `apply` (boundaries, Offers Platform OAAR). After this, `plan` shows no changes.
 6. **Owner:** set root MFA in ABC Bank (password recovery on its email), and confirm root MFA and no root keys in Offers Platform.
@@ -242,7 +260,7 @@ Teardown: none. Everything is long-lived. `prevent_destroy` and `close_on_deleti
 
 ### 3.9 `README.md` sections
 
-Manual steps (3.8 steps 0, 1, 4, 6, the Identity Center instance tag step, and Cost Explorer), Setup order, CLI profiles, **Recovery**, and **Offers Platform IAM inventory**.
+Manual steps (3.8 steps 0, 1, 3a, 4, 6, the Identity Center instance tag step, and Cost Explorer), Setup order, CLI profiles, **Recovery**, and **Offers Platform IAM inventory**.
 
 - **Recovery** covers two paths:
   - management account: root plus MFA, then fix Identity Center or the permission set;
@@ -288,7 +306,7 @@ Effect on existing data:
 | AC6/AC7 now include extra sub-checks (D6), so a small policy error fails the whole criterion | Intended: the sub-checks are the contract. The FAIL text names each failed sub-check |
 | The baseline is taken late (after the invitation) or not at all, so TC67/TC68 have nothing to compare against | 3.8 step 0 comes before the invitation; REG lines FAIL with "baseline missing" rather than passing |
 | The baseline leaks into the public repo | Stored outside the working tree by default; README warns not to set `FND3_BASELINE_DIR` inside the repo; TC71 (repo hygiene) checks for account IDs and credentials in tracked files |
-| The Offers Platform account is on the AWS Free plan or in another organization, so the invitation fails | README step 3 checks with `aws organizations describe-organization` inside Offers Platform before inviting |
+| **The Offers Platform account is the management account of its own one-account organization** (found at setup, Nov 3, 2026: `FeatureSet: ALL`, only itself, no OUs, delegated administrators, organization trail or SCP policy type; trusted access only for `sso.amazonaws.com`; no Identity Center instance). A management account cannot accept an invitation | Owner step 3a (D9) deletes it first. `get-caller-identity`, `describe-organization`, `list-accounts` and `list-delegated-administrators` confirm it is the right account and holds only itself; anything else means stop and ask. `describe-organization` must then return `AWSOrganizationsNotInUseException`. **Deletion is irreversible**, but the organization was unused (no members, OUs, SCPs, trail or Identity Center instance), so nothing depends on it. Account-level IAM users, keys and roles, data, workloads and account-level budgets are not touched; REG-TC67/TC68 confirm IAM against the step 0 baseline. The service-linked roles `AWSServiceRoleForOrganizations` and `AWSServiceRoleForSSO` left from that organization stay as they are: they are under `/aws-service-role/`, so the baseline excludes them (3.8 step 0), and this story does not touch them. If the invitation still fails (for example the account is on the AWS Free plan), step 3b stops and the owner is asked |
 | An `OrganizationAccountAccessRole` already exists in Offers Platform | README step 5 runs `aws iam get-role` first; if it exists, stop and ask (do not import silently, since it may be in use). The baseline (step 0) shows it in advance |
 | Member Cost Explorer reads depend on the management account's billing-access and linked-account access settings | README step 1 turns on "IAM user and role access to Billing information" and keeps linked-account access on; AC5 runs a real `ce get-cost-and-usage` from ABC Bank |
 | The bucket name `aws-foundations-tfstate-lakshmi100` is taken globally | `bootstrap` apply fails. Pick a new name and update `var.state_bucket_name` and every `backend.tf` together |
@@ -318,7 +336,7 @@ sequenceDiagram
     participant Org as Organizations / Identity Center
     participant OP as Offers Platform account
     participant ABC as ABC Bank account
-    Owner->>OP: baseline IAM users, keys, roles (read-only, existing credentials) to local dir outside repo
+    Owner->>OP: step 0: baseline IAM users, keys, roles (read-only, existing credentials) to local dir outside repo
     Owner->>Root: sign up, root MFA
     Root->>Org: billing access for IAM, enable Identity Center (creates org, ALL), MFA setting, user, Administrator PS + mgmt assignment, Cost Explorer
     Owner->>Admin: aws sso login (fnd-management-admin)
@@ -326,7 +344,8 @@ sequenceDiagram
     Admin->>Org: organization/ import org, management account, user, PS, assignment
     Admin->>Org: targeted apply (TF_VAR_* member profiles = mgmt): ABC Bank account, permission sets, admin assignments, tags on mgmt account + PSs
     Admin->>Org: sso-admin tag-resource (Identity Center instance)
-    Admin->>Org: invite-account-to-organization (Offers Platform)
+    Owner->>OP: step 3a (existing credentials): confirm own org holds only itself, delete-organization, confirm AWSOrganizationsNotInUseException
+    Admin->>Org: step 3b: invite-account-to-organization (Offers Platform)
     Owner->>OP: accept invitation (existing credentials)
     Admin->>Org: import Offers Platform account; targeted apply: engineering assignments
     Admin->>ABC: full apply: boundary policy (fnd-abc-bank-admin)
@@ -387,3 +406,9 @@ sequenceDiagram
     - Options: accept as is; reduce it now with exact-match action wildcards; narrow A.
     - Decision: accept as is for FND-3. Statement IDs are not part of the contract (3.4).
     - Consequence: ABC-6 must choose a fallback (for example exact-match action wildcards) before it adds permissions to the ABC Bank engineering role. Record this on the ABC-6 issue.
+- **D9 Offers Platform's existing one-account organization** (revision 4, setup finding; owner decision, Nov 3, 2026).
+  - Context: at setup step 0 the Offers Platform account turned out to be the management account of its own organization, which held only itself (no OUs, delegated administrators, organization trail, SCP policy type or Identity Center instance; trusted access only for `sso.amazonaws.com`). AWS does not let a management account accept an invitation.
+  - Options: (a) the owner deletes that organization from inside Offers Platform, then the invitation goes ahead as planned; (b) make Offers Platform the management account of the new organization.
+  - Decision: (a), as owner manual step 3a (3.8), just before the invitation (3b), with read-only checks before and after and "stop and ask" if the organization holds anything but the account itself.
+  - Why: (b) conflicts with the roadmap's dedicated management account and would put the v1/v2 workload in the one account SCPs never apply to. The organization being deleted was unused.
+  - Consequences: one more manual step (story requirement 9). Deletion cannot be undone. Account-level IAM, data, workloads and budgets are not affected. The leftover service-linked roles `AWSServiceRoleForOrganizations` and `AWSServiceRoleForSSO` stay and are not touched; they are outside the baseline (3.8 step 0) and the regressions. No change to the Terraform contract, the policies or `tests/FND-3.sh`.
