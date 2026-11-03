@@ -46,7 +46,9 @@ done by the owner, in this order, as part of [Setup](#setup):
 |------|---------------|------|
 | 0 | Owner, Offers Platform, existing credentials, read only | Take the IAM baseline (before the invitation) |
 | 1 | Owner, management account root, console | Sign up, root MFA, enable Identity Center and its MFA setting, create the engineer user and the `Administrator` permission set and its assignment, enable Cost Explorer, then sign out of root |
-| 3 | Owner, `fnd-management-admin` | Tag the Identity Center instance (CLI), send the invitation to Offers Platform (CLI) |
+| 3 | Owner, `fnd-management-admin` | Tag the Identity Center instance (CLI) |
+| 3a | Owner, Offers Platform, existing credentials (not root, not an `fnd-*` profile) | Check Offers Platform's own one-account organization holds only itself, delete it, and confirm it is gone (CLI, just before 3b) |
+| 3b | Owner, `fnd-management-admin` | Send the invitation to Offers Platform (CLI) |
 | 4 | Owner, Offers Platform, existing credentials | Accept the invitation |
 | 6 | Owner, ABC Bank and Offers Platform root users | Set root MFA in ABC Bank; confirm root MFA and no root access keys in Offers Platform |
 
@@ -132,7 +134,7 @@ otherwise. Do the steps in order; each step says who does it.
 
 ### Step 0: Offers Platform IAM baseline (owner, before the invitation)
 
-Before Offers Platform is invited (step 3), take a read-only snapshot of its
+Before Offers Platform is invited (step 3b), take a read-only snapshot of its
 IAM users, access keys and roles with the credentials you use for that account
 today. Nothing is created or changed. The regression checks (`REG-TC67`,
 `REG-TC68` in `tests/FND-3.sh`) compare against it, and the roles in it are by
@@ -246,6 +248,8 @@ export AWS_PROFILE=fnd-management-admin
 export TF_VAR_abc_bank_admin_profile=fnd-management-admin
 export TF_VAR_offers_platform_admin_profile=fnd-management-admin
 terraform -chdir=organization init
+# No plain `terraform apply` (without -target) until step 5: it would create
+# aws_organizations_account.offers_platform as a new account.
 ```
 
 Look up the IDs of what step 1 created:
@@ -322,15 +326,45 @@ aws sso-admin tag-resource --instance-arn "$INSTANCE_ARN" --resource-arn "$INSTA
 aws sso-admin list-tags-for-resource --instance-arn "$INSTANCE_ARN" --resource-arn "$INSTANCE_ARN"
 ```
 
-Invite Offers Platform. First, with your existing Offers Platform
-credentials, check it is not in another organization (this must fail with
-`AWSOrganizationsNotInUseException`) and is not on the AWS Free plan:
+### Step 3a: delete Offers Platform's own organization (owner, inside Offers Platform)
+
+Offers Platform is the management account of its own one-account
+organization, and a management account cannot accept an invitation. Delete
+that organization just before step 3b, after the step 0 baseline. Use your
+existing Offers Platform credentials: **not root and not an `fnd-*` profile**.
+These checks are read-only; **if any of them fails, stop and ask** (do not
+remove accounts, deregister administrators or delete anything).
 
 ```bash
+export OP_PROFILE=<your existing Offers Platform profile>
+# 1. The account is Offers Platform (never the new management account).
+aws sts get-caller-identity --profile "$OP_PROFILE"
+# 2. MasterAccountId equals the Offers Platform account ID.
 aws organizations describe-organization --profile "$OP_PROFILE"
+# 3. Exactly one account: Offers Platform itself.
+aws organizations list-accounts --profile "$OP_PROFILE"
+# 4. No delegated administrators (empty list).
+aws organizations list-delegated-administrators --profile "$OP_PROFILE"
 ```
 
-Then, from the management account:
+All four as expected? Delete the organization, then confirm it is gone. The
+last command must fail with `AWSOrganizationsNotInUseException`; if it
+returns an organization, stop and ask.
+
+```bash
+aws organizations delete-organization --profile "$OP_PROFILE"
+aws organizations describe-organization --profile "$OP_PROFILE"   # must fail: AWSOrganizationsNotInUseException
+```
+
+Deleting the organization is irreversible, but it held nothing but the account
+itself. The account's IAM users, keys, roles, data and workloads are not
+touched. Record only the outcome (commands run, exception seen) in the PR,
+never the organization ID or account ID.
+
+### Step 3b: invite Offers Platform (owner, `fnd-management-admin`)
+
+From the management account. If the invitation fails (for example the
+account is on the AWS Free plan), stop and ask.
 
 ```bash
 aws organizations invite-account-to-organization \
