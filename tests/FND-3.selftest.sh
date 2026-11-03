@@ -11,12 +11,19 @@ set -euo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SCRIPT="$HERE/FND-3.sh"
 
-# shellcheck source=FND-3.sh
-. "$SCRIPT"
-
 ST_FAIL=0
 ST_TMP=$(mktemp -d "${TMPDIR:-/tmp}/fnd3-selftest.XXXXXX")
 trap 'rm -rf "$ST_TMP"' EXIT
+
+# Isolate from the owner's real baseline ($HOME/.fnd-3-baseline): every case
+# reads an empty scratch baseline unless it passes its own (run_stubbed).
+ST_BASELINE="$ST_TMP/no-baseline"
+mkdir -p "$ST_BASELINE"
+export FND3_BASELINE_DIR="$ST_BASELINE"
+
+# shellcheck source=FND-3.sh
+. "$SCRIPT"
+BASELINE_DIR=$ST_BASELINE
 
 ok() { printf 'PASS %s %s\n' "$1" "$2"; }
 ko() {
