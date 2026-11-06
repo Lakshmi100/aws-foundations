@@ -194,6 +194,13 @@ If it is, stop and decide with the owner what to do before step 5.
    information** (so the Administrator role can use Cost Explorer).
 3. Enable **IAM Identity Center** in `us-east-1`. This creates the
    organization with all features.
+   **Before you choose Enable, set the console's Region selector (top right)
+   to US East (N. Virginia).** Identity Center is created in whatever Region
+   the console shows, and it cannot be moved afterwards: an instance in any
+   other Region has to be deleted (as root: Identity Center, Settings,
+   Management, Delete) and enabled again, and everything in it recreated.
+   Choose **Single-Region instance**; its settings must show Primary Region
+   US East (N. Virginia).
 4. Identity Center, Settings, Authentication, Multi-factor authentication:
    - prompt users for MFA **every time they sign in**;
    - MFA types: **authenticator apps** and **security keys** only;

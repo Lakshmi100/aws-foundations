@@ -29,3 +29,4 @@
 2026-11-03T19:58:49Z | setup | finding | Offers Platform account is mgmt of own 1-account org; owner: delete it before invitation; issue #3 req 2/9 updated, story.md re-synced
 2026-11-03T20:07:06Z | implementation | escalation | selftest TC07 not isolated from owner's ~/.fnd-3-baseline (passes 53/53 with FND3_BASELINE_DIR empty); tester-owned, brought to owner
 2026-11-03T21:15:29Z | tests | fix | selftest isolated from ~/.fnd-3-baseline (owner approved); 53/53 PASS
+2026-11-06T18:25:24Z | setup | finding | Identity Center first enabled in us-east-2; owner deleting and re-enabling in us-east-1 (single-Region); README step 1 region warning added
