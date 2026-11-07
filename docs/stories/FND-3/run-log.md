@@ -30,3 +30,5 @@
 2026-11-03T20:07:06Z | implementation | escalation | selftest TC07 not isolated from owner's ~/.fnd-3-baseline (passes 53/53 with FND3_BASELINE_DIR empty); tester-owned, brought to owner
 2026-11-03T21:15:29Z | tests | fix | selftest isolated from ~/.fnd-3-baseline (owner approved); 53/53 PASS
 2026-11-06T18:25:24Z | setup | finding | Identity Center first enabled in us-east-2; owner deleting and re-enabling in us-east-1 (single-Region); README step 1 region warning added
+2026-11-06T23:22:01Z | setup | progress | steps 1-3 done (IdC re-enabled us-east-1, ABC Bank created, item-5 apply, instance tagged); 3a org deleted (NotInUse confirmed); 3b invitation OPEN
+2026-11-07T00:01:51Z | setup | progress | step 4 invitation accepted (3 ACTIVE accounts); step 5 targeted + full apply done, plan -detailed-exitcode 0; next: step 6 member root MFA, then tests/FND-3.sh after Cost Explorer data is ready
