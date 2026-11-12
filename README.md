@@ -266,8 +266,10 @@ ORG_ID=$(aws organizations describe-organization --query Organization.Id --outpu
 MGMT_ID=$(aws sts get-caller-identity --query Account --output text)
 read -r INSTANCE_ARN IDENTITY_STORE_ID <<<"$(aws sso-admin list-instances \
   --query 'Instances[0].[InstanceArn,IdentityStoreId]' --output text)"
+# The user name comes from the untracked tfvars, so it is never written here.
+ENGINEER_USER_NAME=$(sed -n 's/^engineer_user_name *= *"\(.*\)".*/\1/p' organization/terraform.tfvars)
 USER_ID=$(aws identitystore get-user-id --identity-store-id "$IDENTITY_STORE_ID" \
-  --alternate-identifier '{"UniqueAttribute":{"AttributePath":"userName","AttributeValue":"<engineer_user_name>"}}' \
+  --alternate-identifier "{\"UniqueAttribute\":{\"AttributePath\":\"userName\",\"AttributeValue\":\"$ENGINEER_USER_NAME\"}}" \
   --query UserId --output text)
 for ps in $(aws sso-admin list-permission-sets --instance-arn "$INSTANCE_ARN" --query 'PermissionSets[]' --output text); do
   name=$(aws sso-admin describe-permission-set --instance-arn "$INSTANCE_ARN" --permission-set-arn "$ps" \
