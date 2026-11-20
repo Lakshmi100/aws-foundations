@@ -257,10 +257,15 @@ csv_rows() {
 
 baseline_ok() { [ -s "$BASELINE_DIR/$1" ] && [ -r "$BASELINE_DIR/$1" ] && jq -e . "$BASELINE_DIR/$1" >/dev/null 2>&1; }
 
+# jq definition: a policy document with every array sorted. IAM treats
+# principal, action, resource and statement lists as sets and returns them in
+# a different order from call to call, so documents are compared this way.
+POLICY_NORM='def pnorm: walk(if type == "array" then sort else . end);'
+
 # Normalised baseline roles, one compact JSON object per line.
 baseline_roles() {
-  jqq -c '
-    def doc: if type == "string" then (try fromjson catch .) else . end;
+  jqq -c "$POLICY_NORM"'
+    def doc: (if type == "string" then (try fromjson catch .) else . end) | pnorm;
     (if type == "object" then (.Roles // [.]) else . end) | .[]
     | (.Role // .) as $r
     | {
@@ -1277,7 +1282,7 @@ check_reg68() {
     fi
     [ "$(printf '%s' "$live" | jqq -r '.Role.PermissionsBoundary // empty')" = "" ] || echo "role $name: permissions boundary attached"
     [ "$(printf '%s' "$live" | jqq -r '.Role.Path')" = "$(printf '%s' "$e" | jqq -r '.path')" ] || echo "role $name: path changed"
-    trust=$(printf '%s' "$live" | jqq -S -c '.Role.AssumeRolePolicyDocument | if type == "string" then fromjson else . end')
+    trust=$(printf '%s' "$live" | jqq -S -c "$POLICY_NORM"'.Role.AssumeRolePolicyDocument | (if type == "string" then fromjson else . end) | pnorm')
     [ "$trust" = "$(printf '%s' "$e" | jqq -S -c '.trust')" ] || echo "role $name: trust policy changed"
     attached=$(awsp "$P_OP_ADMIN" iam list-attached-role-policies --role-name "$name" --output json | jqq -c '[.AttachedPolicies[].PolicyArn] | sort') || attached="error"
     [ "$attached" = "$(printf '%s' "$e" | jqq -c '.attached')" ] || echo "role $name: attached policies changed"
@@ -1285,7 +1290,7 @@ check_reg68() {
     [ "$names" = "$(printf '%s' "$e" | jqq -c '.inline_names')" ] || { echo "role $name: inline policy names changed"; continue; }
     for pn in $(printf '%s' "$names" | jqq -r '.[]'); do
       doc=$(awsp "$P_OP_ADMIN" iam get-role-policy --role-name "$name" --policy-name "$pn" --query PolicyDocument --output json |
-        jqq -S -c 'if type == "string" then fromjson else . end') || doc="error"
+        jqq -S -c "$POLICY_NORM"'(if type == "string" then fromjson else . end) | pnorm') || doc="error"
       inline=$(printf '%s' "$e" | jqq -S -c --arg p "$pn" '.inline[$p] // "absent"')
       [ "$inline" != '"absent"' ] || { echo "role $name: baseline has no document for inline policy $pn"; continue; }
       [ "$doc" = "$inline" ] || echo "role $name: inline policy $pn changed"
@@ -1324,7 +1329,10 @@ pr_evidence() {
     log "EVIDENCE TC71 key-like strings (file:line): ${v:-none}"
     v=$(git -C "$CLONE" grep -nE '(^|[^0-9])[0-9]{12}([^0-9]|$)' -- '*.tf' 2>/dev/null | grep -vE '^[^:]*variables\.tf:' | cut -d: -f1,2 || true)
     log "EVIDENCE TC71 12-digit numbers in .tf outside variables.tf (file:line): ${v:-none}"
-    v=$(git -C "$CLONE" grep -nE 'source *= *"hashicorp/aws"' -A2 -- '*.tf' 2>/dev/null | grep -E 'version' | sed 's/^/  /' || true)
+    # Options before the pattern (after it, git reads -A2 as a revision), and
+    # match only `version =` lines, not the versions.tf file name.
+    v=$(git -C "$CLONE" grep -nE -A2 'source *= *"hashicorp/aws"' -- '*.tf' 2>/dev/null |
+      grep -E '^[^:]+[-:][0-9]+[-:][[:space:]]*version[[:space:]]*=' | sed 's/^/  /' || true)
     log "EVIDENCE TC71 aws provider version constraints: ${v:-none found}"
     v=$(git -C "$CLONE" grep -nE 'region *= *"' -- '*.tf' 2>/dev/null | grep -v 'us-east-1' | cut -d: -f1,2 || true)
     log "EVIDENCE TC71 region settings other than us-east-1 (file:line): ${v:-none}"

@@ -32,3 +32,4 @@
 2026-11-06T18:25:24Z | setup | finding | Identity Center first enabled in us-east-2; owner deleting and re-enabling in us-east-1 (single-Region); README step 1 region warning added
 2026-11-06T23:22:01Z | setup | progress | steps 1-3 done (IdC re-enabled us-east-1, ABC Bank created, item-5 apply, instance tagged); 3a org deleted (NotInUse confirmed); 3b invitation OPEN
 2026-11-07T00:01:51Z | setup | progress | step 4 invitation accepted (3 ACTIVE accounts); step 5 targeted + full apply done, plan -detailed-exitcode 0; next: step 6 member root MFA, then tests/FND-3.sh after Cost Explorer data is ready
+2026-11-20T21:18:36Z | tests | fix | REG-TC68 compared policy arrays in order (IAM returns them unordered; CloudTrail: no trust edits); TC71 provider-pin grep broken (-A2 after pattern); both fixed (owner approved); selftest 59/59 PASS; real-account rerun pending owner SSO login

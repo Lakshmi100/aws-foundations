@@ -195,6 +195,53 @@ STUB_TAGS=$GOOD_TAGS
 printf 'aws_kms_alias.x\n' >>"$WORK/state.organization"
 expect_line TC63 "AC14 line, unchecked resource type in state" FAIL AC14 check_ac14
 
+# ------------------------------------------------------------ TC68 (policy lists compared as sets)
+# IAM returns principal and action lists in a different order from call to
+# call; a reordering is not a change, a different member is.
+R68_BASE="$ST_TMP/reg68-baseline"
+mkdir -p "$R68_BASE"
+cat >"$R68_BASE/roles.json" <<'EOF'
+[{"Role":{"RoleName":"r1","Path":"/","AssumeRolePolicyDocument":{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["lambda.amazonaws.com","ecs-tasks.amazonaws.com"]},"Action":"sts:AssumeRole"}]}},
+  "AttachedPolicies":[],"PolicyNames":["p1"],
+  "RolePolicies":[{"PolicyName":"p1","PolicyDocument":{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject","s3:ListBucket"],"Resource":"*"}]}}]}]
+EOF
+STUB_R68_TRUST='{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["ecs-tasks.amazonaws.com","lambda.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
+STUB_R68_INLINE='{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:ListBucket","s3:GetObject"],"Resource":"*"}]}'
+awsp_main=$(declare -f awsp)
+awsp() {
+  shift
+  case "$1 $2" in
+    "iam get-role") printf '{"Role":{"RoleName":"r1","Path":"/","AssumeRolePolicyDocument":%s}}' "$STUB_R68_TRUST" ;;
+    "iam list-attached-role-policies") printf '{"AttachedPolicies":[]}' ;;
+    "iam list-role-policies") printf '{"PolicyNames":["p1"]}' ;;
+    "iam get-role-policy") printf '%s' "$STUB_R68_INLINE" ;;
+    *) return 1 ;;
+  esac
+}
+BASELINE_DIR=$R68_BASE
+expect_clean TC68 "trust principals and inline actions only reordered" check_reg68
+STUB_R68_TRUST='{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["ecs-tasks.amazonaws.com","ec2.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
+expect_problems TC68 "trust principal replaced" check_reg68
+STUB_R68_TRUST='{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["ecs-tasks.amazonaws.com","lambda.amazonaws.com","ec2.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
+expect_problems TC68 "trust principal added" check_reg68
+STUB_R68_TRUST='{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":["ecs-tasks.amazonaws.com","lambda.amazonaws.com"]},"Action":"sts:AssumeRole"}]}'
+STUB_R68_INLINE='{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:ListBucket","s3:PutObject"],"Resource":"*"}]}'
+expect_problems TC68 "inline policy action replaced" check_reg68
+BASELINE_DIR=$ST_BASELINE
+eval "$awsp_main"
+
+# ------------------------------------------------------------ TC71 (provider pin evidence)
+PIN_REPO="$ST_TMP/pin-repo"
+mkdir -p "$PIN_REPO/root"
+printf 'terraform {\n  required_providers {\n    aws = {\n      source  = "hashicorp/aws"\n      version = "~> 6.0"\n    }\n  }\n}\n' >"$PIN_REPO/root/versions.tf"
+git -C "$PIN_REPO" init -q && git -C "$PIN_REPO" add -A
+pins=$(git -C "$PIN_REPO" grep -nE -A2 'source *= *"hashicorp/aws"' -- '*.tf' 2>/dev/null |
+  grep -E '^[^:]+[-:][0-9]+[-:][[:space:]]*version[[:space:]]*=' || true)
+[ "$(printf '%s\n' "$pins" | grep -c 'version = "~> 6.0"')" = 1 ] && [ "$(printf '%s\n' "$pins" | wc -l | tr -d ' ')" = 1 ] &&
+  ok TC71 "provider pin evidence finds exactly the version line" || ko TC71 "provider pin evidence got: '$pins'"
+grep -qF "grep -nE -A2 'source *= *\"hashicorp/aws\"'" "$SCRIPT" &&
+  ok TC71 "script runs the same provider pin search" || ko TC71 "script's provider pin search differs from the self-test"
+
 # ------------------------------------------------------------ TC72 (whole script, stub commands)
 STUB_BIN="$ST_TMP/bin"
 mkdir -p "$STUB_BIN"
