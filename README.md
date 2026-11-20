@@ -522,7 +522,7 @@ reviews them before commit.
 
 | User | Created |
 |------|---------|
-| _to be filled by the owner_ | |
+| AWS_admin | 2018-02-21 |
 
 Users with no access keys appear here and not in the next table.
 
@@ -530,15 +530,25 @@ Users with no access keys appear here and not in the next table.
 
 | User | Key ID (last 4) | Status | Last used | Service | Region |
 |------|-----------------|--------|-----------|---------|--------|
-| _to be filled by the owner_ | | | | | |
+| AWS_admin | IB5A | Inactive | 2018-03-01 | s3 | N/A |
+| AWS_admin | E7X4 | Active | 2026-11-20 | sts | us-east-1 |
 
 A key that was never used shows "never used" in the last three columns.
+
+Filled in on 2026-11-20. Key `E7X4`'s 2026-11-20 `sts` use was an identity
+check during FND-3 setup. The last use before that (2026-11-06, `s3`,
+`us-east-1`) is the better guide to what the v1/v2 tools use it for.
 
 ### Existing v1/v2 IAM roles
 
 | Role | Path |
 |------|------|
-| _to be filled by the owner_ | |
+| AmazonSageMakerServiceCatalogProductsUseRole | /service-role/ |
+| AWSGlueServiceRole | /service-role/ |
+| csa-dev-api-role | / |
+| csa-dev-ingestion-role | / |
+| csa-dev-ml-role | / |
+| csa-dev-snowflake-storage-role | / |
 
 These are exactly the roles in the step 0 baseline `roles.json`. Roles this
 repo adds (`OrganizationAccountAccessRole`, the `AWSReservedSSO_` roles) are
