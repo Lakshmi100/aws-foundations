@@ -34,3 +34,4 @@
 2026-11-07T00:01:51Z | setup | progress | step 4 invitation accepted (3 ACTIVE accounts); step 5 targeted + full apply done, plan -detailed-exitcode 0; next: step 6 member root MFA, then tests/FND-3.sh after Cost Explorer data is ready
 2026-11-20T21:18:36Z | tests | fix | REG-TC68 compared policy arrays in order (IAM returns them unordered; CloudTrail: no trust edits); TC71 provider-pin grep broken (-A2 after pattern); both fixed (owner approved); selftest 59/59 PASS; real-account rerun pending owner SSO login
 2026-11-20T21:51:22Z | tests | run | tests/FND-3.sh against real accounts: 13 PASS AC lines, 4 MANUAL (AC3, AC8, AC11, AC15), REG-TC67 PASS, REG-TC68 PASS; AC8 README inventory filled from the README script and matches the test's inventory
+2026-11-21T04:02:21Z | deliver | pr | owner MANUAL evidence received (AC3 TC10, AC11, TC69; TC11 screenshot pending); PR opened with redacted evidence; screenshots to be attached by the owner after redaction
