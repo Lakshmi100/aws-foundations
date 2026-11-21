@@ -22,7 +22,7 @@ Roadmap decision: three accounts, "Management + Shared Services" (new), "ABC Ban
 
 1. **Organization:** an AWS Organization with **all features** enabled (required by Identity Center and by FND-4 (#4)'s organization trail), with the Management + Shared Services account as its management account and consolidated billing.
 2. **Accounts:** the ABC Bank account is created in the organization; the existing Offers Platform account is invited and joins it. That account is today the management account of its own one-account organization (created Feb 12, 2026; no other accounts, OUs, delegated administrators or organization trail), which AWS must delete before the account can accept an invitation.
-3. **Sign-in:** IAM Identity Center is enabled with one user for the engineer. MFA is required **at every sign-in**, using an authenticator app or security key.
+3. **Sign-in:** IAM Identity Center is enabled with one user for the engineer. MFA is required **at every sign-in**, using an authenticator app, a security key or a passkey (Identity Center's "built-in authenticators"); no email one-time codes.
 4. **Roles (Identity Center permission sets):**
    - **Administrator**, in each of the three accounts: for setup, recovery and applying long-lived foundations (ABC-3 (Lakshmi100/abc-bank#3), ABC-4 (Lakshmi100/abc-bank#4), ABC-5 (Lakshmi100/abc-bank#5) and FND-4 (#4)). Not for day-to-day work.
    - **ABC Bank engineering**, in the ABC Bank account, for session work from ABC-6 (Lakshmi100/abc-bank#6) on. It can:

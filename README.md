@@ -189,7 +189,7 @@ If it is, stop and decide with the owner what to do before step 5.
 ### Step 1: management account, by hand as root (owner, console)
 
 1. Sign up the Management + Shared Services account. Set MFA on the root user
-   (authenticator app or security key). Create no root access keys.
+   (authenticator app, security key or passkey). Create no root access keys.
 2. Account settings: turn on **IAM user and role access to Billing
    information** (so the Administrator role can use Cost Explorer).
 3. Enable **IAM Identity Center** in `us-east-1`. This creates the
@@ -203,7 +203,8 @@ If it is, stop and decide with the owner what to do before step 5.
    US East (N. Virginia).
 4. Identity Center, Settings, Authentication, Multi-factor authentication:
    - prompt users for MFA **every time they sign in**;
-   - MFA types: **authenticator apps** and **security keys** only;
+   - MFA types: **authenticator apps**, **security keys** and **built-in
+     authenticators** (passkeys); no email one-time codes;
    - if a user has no registered MFA device: **require them to register an
      MFA device at sign in**.
 5. Identity Center, Users: create the engineer. Use the same values as
@@ -430,8 +431,8 @@ cd ..
 ### Step 6: member-account root users (owner)
 
 - **ABC Bank:** sign in as root with the ABC Bank account email, use "Forgot
-  password" to set a password, then set root MFA (authenticator app or
-  security key). Create no root access keys.
+  password" to set a password, then set root MFA (authenticator app,
+  security key or passkey). Create no root access keys.
 - **Offers Platform:** confirm the root user has MFA and no access keys.
 
 ### Checks
