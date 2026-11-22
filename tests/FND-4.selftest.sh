@@ -643,6 +643,33 @@ expect_problems TC60 "does not say the old bucket is kept" ac11_procedure_eval "
 [ "$(printf 'to %s\n' "$FAKE_EMAIL" | count_sensitive)" = 1 ] && ok TC53 "an e-mail address is flagged" || ko TC53 "e-mail not flagged"
 [ "$(printf 'alert_email = "alerts@example.com"\n' | count_sensitive)" = 0 ] && ok TC53 "the example.com placeholder is allowed" || ko TC53 "placeholder flagged"
 [ "$(printf 'alerts@example.com and %s\n' "$M" | count_sensitive)" = 1 ] && ok TC53 "a placeholder does not hide an account ID on the same line" || ko TC53 "ID next to placeholder not flagged"
+[ "$(printf 'echo x@example.com > out-3.txt; sleep 15 # step 2 of 4\n' | count_sensitive)" = 0 ] && ok TC53 "a placeholder on a line with other (non-12-digit) digits is allowed" || ko TC53 "placeholder with other digits flagged"
+[ "$(printf 'a@example.com, b@example.org. c@example.net\n' | count_sensitive)" = 0 ] && ok TC53 "several placeholders on one line are allowed" || ko TC53 "several placeholders flagged"
+[ "$(printf 'alerts@example.com and %s\n' "$FAKE_EMAIL" | count_sensitive)" = 1 ] && ok TC53 "a placeholder does not hide a real e-mail address on the same line" || ko TC53 "real e-mail next to placeholder not flagged"
+[ "$(printf 'to %s@example.com\n' "$M" | count_sensitive)" = 1 ] && ok TC53 "a 12-digit number inside a placeholder address is flagged" || ko TC53 "12-digit local part not flagged"
+[ "$(printf 'to ops%sexample.com.au\n' "$(printf '\100')" | count_sensitive)" = 1 ] && ok TC53 "example.com.au is not a placeholder domain" || ko TC53 "example.com.au treated as a placeholder"
+
+# TC53 committed-diff scan: tests/ and docs/ are not scanned; other files (README.md included) are.
+TC53R="$ST_TMP/tc53-repo"
+tc53_git() { git -C "$TC53R" -c user.name=selftest -c user.email=selftest@example.com -c commit.gpgsign=false "$@" >/dev/null 2>&1; }
+mkdir -p "$TC53R"
+git init -q "$TC53R" >/dev/null 2>&1
+printf 'base\n' >"$TC53R/README.md"
+tc53_git add -A && tc53_git commit -q -m base
+TC53B=$(git -C "$TC53R" rev-parse HEAD)
+mkdir -p "$TC53R/tests/fixtures" "$TC53R/docs/stories" "$TC53R/guardrails"
+printf 'jq 1000 %s\n' "$M" >"$TC53R/tests/x.sh"
+printf 'arn:aws:s3:::b-%s\n' "$M" >"$TC53R/tests/fixtures/f.json"
+printf 'to %s %s\n' "$FAKE_EMAIL" "$A" >"$TC53R/docs/stories/plan.md"
+tc53_git add -A && tc53_git commit -q -m tests-docs
+[ "$(tc53_diff_count "$TC53R" "$TC53B")" = 0 ] && ok TC53 "IDs and addresses under tests/ and docs/ are not scanned" || ko TC53 "tests/ or docs/ scanned: $(tc53_diff_count "$TC53R" "$TC53B")"
+printf 'variable "x" { default = "%s" }\n' "$M" >"$TC53R/guardrails/main.tf"
+tc53_git add -A && tc53_git commit -q -m tf
+[ "$(tc53_diff_count "$TC53R" "$TC53B")" = 1 ] && ok TC53 "a 12-digit number in a scanned non-test file is flagged" || ko TC53 "12-digit number in guardrails/main.tf: count $(tc53_diff_count "$TC53R" "$TC53B")"
+printf 'mail %s\n' "$FAKE_EMAIL" >>"$TC53R/README.md"
+printf 'id %s\n' "$O" >"$TC53R/testsuite.txt"
+tc53_git add -A && tc53_git commit -q -m readme
+[ "$(tc53_diff_count "$TC53R" "$TC53B")" = 3 ] && ok TC53 "README.md and a root file named like tests* are still scanned" || ko TC53 "README.md or testsuite.txt not scanned: count $(tc53_diff_count "$TC53R" "$TC53B")"
 
 SRC="$ST_TMP/src" DST="$ST_TMP/dst"
 fixture legacy-src-keys.txt >"$SRC"

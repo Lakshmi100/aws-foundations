@@ -924,9 +924,23 @@ ac11_procedure_eval() {
 }
 
 # AC11 TC53: 12-digit numbers and e-mail addresses. Reads text on stdin, prints a count.
+# The example.com/.net/.org exception applies per match, not per line: the
+# "@example.<tld>" part of each placeholder address is removed first (so
+# x@example.com.au is not a placeholder), then every line that still holds a
+# 12-digit number or an e-mail address is counted. A real ID or address on the
+# same line as a placeholder is still counted.
 count_sensitive() {
-  { grep -E '(^|[^0-9])[0-9]{12}([^0-9]|$)|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' || true; } |
-    { grep -vE '^[^0-9@]*[A-Za-z0-9._%+-]+@example\.(com|net|org)[^0-9@]*$' || true; } | wc -l | tr -d ' '
+  sed -E 's/@example\.(com|net|org)(\.?)([^A-Za-z0-9.-]|$)/ \2\3/g' |
+    { grep -E '(^|[^0-9])[0-9]{12}([^0-9]|$)|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' || true; } | wc -l | tr -d ' '
+}
+
+# AC11 TC53: lines added since BASE in non-test, non-docs files that hold a
+# 12-digit number or an e-mail address. tests/ and docs/ (deliberate
+# placeholders and fixtures) and lock files are not scanned; README.md is.
+# ARGS: REPO BASE. Prints a count.
+tc53_diff_count() {
+  git -C "$1" diff -U0 "$2" HEAD -- . ':(exclude)*.terraform.lock.hcl' ':(exclude)tests/' ':(exclude)docs/' 2>>"$ERRLOG" |
+    { grep -E '^\+' || true; } | { grep -vE '^\+\+\+ ' || true; } | count_sensitive
 }
 
 # AC11/AC14 TC61. ARGS: STATE_SHOW_JSON MGMT_ID TF_DIR
@@ -1719,8 +1733,7 @@ EOF
     if [ -z "$base" ]; then
       echo "TC53 main branch not found, committed diff not scanned"
     else
-      n=$(git -C "$CLONE" diff -U0 "$base" HEAD -- . ':(exclude)*.terraform.lock.hcl' 2>>"$ERRLOG" |
-        { grep -E '^\+' || true; } | { grep -vE '^\+\+\+ ' || true; } | count_sensitive)
+      n=$(tc53_diff_count "$CLONE" "$base")
       [ "$n" = 0 ] || echo "TC53 committed diff adds $n line(s) with a 12-digit number or an e-mail address"
     fi
   fi
