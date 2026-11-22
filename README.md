@@ -14,7 +14,9 @@ organization CloudTrail trail.
 |------|---------------|
 | `bootstrap/` | The S3 bucket that holds Terraform state for every root here (versioned, encrypted, TLS only, no public access, S3-native locking) |
 | `organization/` | The organization, the three accounts, Identity Center (user, permission sets, assignments), the permissions boundary in each member account, and `OrganizationAccountAccessRole` in Offers Platform |
+| `guardrails/` | The organization's monthly cost budget, the per-service Cost Anomaly Detection monitor and its daily email summary, the four active cost-allocation tags, and the organization CloudTrail trail with its log bucket (see [Guardrails](#guardrails-fnd-4)) |
 | `tests/FND-3.sh` | Acceptance checks for FND-3, run against the real accounts (read-only) |
+| `tests/FND-4.sh` | Acceptance checks for FND-4, run against the real accounts (reads, plus one short-lived test bucket in ABC Bank for AC7) |
 | `Makefile` | `make test` (terraform validate for every root) and `make lint` (terraform fmt -check) |
 
 The three accounts:
@@ -25,10 +27,12 @@ The three accounts:
 | ABC Bank | Created by `organization/` |
 | Offers Platform | Existing account; invited and joins |
 
-Region: everything uses `us-east-1`. Cost: the only billed resource is the
+Region: everything uses `us-east-1`. Cost: the billed resources are the
 state bucket (a few KB of state, SSE-S3, no DynamoDB table, no KMS key), well
-under $0.05 per month. Organizations, Identity Center, permission sets and
-assignments are free.
+under $0.05 per month, and the CloudTrail log bucket from `guardrails/`
+(about $0.50 per month, see [Guardrails](#guardrails-fnd-4)). Organizations,
+Identity Center, permission sets and assignments, the budget, anomaly
+detection and the trail's management events are free.
 
 ## Tools
 
@@ -51,6 +55,7 @@ done by the owner, in this order, as part of [Setup](#setup):
 | 3b | Owner, `fnd-management-admin` | Send the invitation to Offers Platform (CLI) |
 | 4 | Owner, Offers Platform, existing credentials | Accept the invitation |
 | 6 | Owner, ABC Bank and Offers Platform root users | Set root MFA in ABC Bank; confirm root MFA and no root access keys in Offers Platform |
+| FND-4 | Owner, `fnd-management-admin`, inbox | The test budget alert ([Guardrails](#guardrails-fnd-4), AC3) |
 
 Agents never use, change or create root credentials, and nothing here creates
 IAM users or access keys.
@@ -455,6 +460,158 @@ state bucket, the `Administrator` permission set and its assignments have
 an account, leave the organization, or remove the last administrator
 assignment.
 
+## Guardrails (FND-4)
+
+`guardrails/` is its own Terraform root (state key
+`guardrails/terraform.tfstate`) and runs only in the management account with
+`fnd-management-admin`. It creates nothing in the member accounts. It holds:
+
+| Resource | Settings |
+|----------|----------|
+| Budget `aws-foundations-monthly-cost` | Monthly, unblended cost, whole organization (no filters). Email at 50, 80 and 100 % of **actual** spend. Limit $100 (`posture = "lean"`) or $300 (`posture = "working"`) |
+| Anomaly monitor and subscription | One per-service (`DIMENSIONAL`/`SERVICE`) monitor; one daily email summary for anomalies with a total impact of $10 or more |
+| Cost-allocation tags | `data-product`, `environment`, `owner`, `cost-center` set to `Active` |
+| Organization trail `aws-foundations-organization-trail` | All three accounts, all regions, read and write management events, log file validation on; no CloudWatch Logs, SNS, KMS or Insights |
+| Trail bucket `aws-foundations-cloudtrail-lakshmi100` | Versioned, all public access blocked, SSE-S3, bucket owner enforced, TLS only. Current objects deleted after 90 days, earlier versions 30 days after they are replaced, expired delete markers removed |
+
+The budget and anomaly emails go to the engineer's address, `alert_email`,
+which is set only in the untracked `guardrails/terraform.tfvars`
+(`guardrails/example.tfvars` shows the shape).
+
+Who can change them: only the management account's `Administrator` role.
+Member accounts cannot change an organization trail, and the bucket grants
+nothing to them. There is no extra deny in the bucket policy (story decision
+Q2), and no service control policy is added. Sign-in and recovery are
+unchanged ([Recovery](#recovery)).
+
+Cost, per month: management events on one trail $0; budgets without actions
+$0; anomaly detection and cost-allocation tags $0; S3 PUTs for digest and log
+files about $0.43; storage (about 120 days of versioned logs, under 1 GB)
+about $0.02. **Expected total: about $0.50 per month**, under the $2 limit.
+Check the bucket's tagged S3 cost in Cost Explorer after a few days.
+
+### Setup (owner, `fnd-management-admin`)
+
+1. **Baseline snapshot, before the first apply (read only).** It records what
+   already exists in Offers Platform and the management account, outside the
+   repo; `tests/FND-4.sh` compares against it. The files hold account IDs and
+   ARNs: never commit them.
+
+   ```bash
+   bash <<'EOF'
+   set -euo pipefail
+   B=${FND4_BASELINE_DIR:-$HOME/.fnd-4-baseline}
+   mkdir -p -m 700 "$B"
+   OP=fnd-offers-platform-admin; M=fnd-management-admin
+   OPID=$(aws --profile $OP sts get-caller-identity --query Account --output text)
+   out='{}'
+   for r in $(aws --profile $OP --region us-east-1 ec2 describe-regions --query 'Regions[].RegionName' --output text); do
+     dt=$(aws --profile $OP --region $r cloudtrail describe-trails --no-include-shadow-trails --output json)
+     entry=$(jq -n --argjson dt "$dt" '{"describe-trails": $dt, trails: []}')
+     for arn in $(echo "$dt" | jq -r '.trailList[]?.TrailARN'); do
+       gt=$(aws --profile $OP --region $r cloudtrail get-trail --name "$arn" --output json)
+       es=$(aws --profile $OP --region $r cloudtrail get-event-selectors --trail-name "$arn" --output json)
+       is=$(aws --profile $OP --region $r cloudtrail get-insight-selectors --trail-name "$arn" --output json 2>/dev/null ||
+         echo '{"TrailARN":"'"$arn"'","InsightSelectors":[]}')
+       ts=$(aws --profile $OP --region $r cloudtrail get-trail-status --name "$arn" --output json)
+       entry=$(echo "$entry" | jq --arg a "$arn" --argjson gt "$gt" --argjson es "$es" --argjson is "$is" --argjson ts "$ts" \
+         '.trails += [{TrailARN: $a, "get-trail": $gt, "get-event-selectors": $es, "get-insight-selectors": $is, "get-trail-status": $ts}]')
+     done
+     out=$(echo "$out" | jq --arg r "$r" --argjson e "$entry" '.[$r] = $e')
+   done
+   echo "$out" >"$B/op-trails.json"
+   # No budgets at all is a NotFoundException (or empty output): record an empty list.
+   b=$(aws --profile $OP budgets describe-budgets --account-id "$OPID" --output json) || b=""
+   [ -n "$b" ] || b='{"Budgets":[]}'
+   jq -n --argjson b "$b" '{"describe-budgets": $b}' >"$B/op-budgets.json"
+   for acct in op mgmt; do
+     p=$OP; [ $acct = mgmt ] && p=$M
+     jq -n --argjson m "$(aws --profile $p ce get-anomaly-monitors --output json)" '{"get-anomaly-monitors": $m}' >"$B/$acct-anomaly-monitors.json"
+     jq -n --argjson s "$(aws --profile $p ce get-anomaly-subscriptions --output json)" '{"get-anomaly-subscriptions": $s}' >"$B/$acct-anomaly-subscriptions.json"
+   done
+   chmod 600 "$B"/*.json
+   EOF
+   ```
+
+   Then fill in [Offers Platform existing setup](#offers-platform-existing-setup-fnd-4)
+   from `op-*.json`.
+
+2. **Tag-key pre-check.** All four keys must be listed (any status). A missing
+   key means AWS has not yet seen it on a billed resource: wait; do not create
+   a resource just to make it appear.
+
+   ```bash
+   aws --profile fnd-management-admin ce list-cost-allocation-tags \
+     --tag-keys data-product environment owner cost-center
+   ```
+
+3. **Import an existing service monitor and its subscription** (story decision
+   Q1). AWS creates `Default-Services-Monitor` and
+   `Default-Services-Subscription` in a new account. If the baseline has a
+   `DIMENSIONAL`/`SERVICE` monitor, import it rather than create a second one,
+   and import the subscription that references it. Only a `SERVICE` monitor is
+   imported; any other monitor, and subscriptions on other monitors, are left
+   alone.
+
+   ```bash
+   cp guardrails/example.tfvars guardrails/terraform.tfvars   # then set alert_email
+   export AWS_PROFILE=fnd-management-admin
+   B=${FND4_BASELINE_DIR:-$HOME/.fnd-4-baseline}
+   MON=$(jq -r '[.. | objects | select(has("MonitorArn") and .MonitorType == "DIMENSIONAL" and .MonitorDimension == "SERVICE") | .MonitorArn] | unique | .[]' "$B/mgmt-anomaly-monitors.json")
+   SUB=$(jq -r --arg m "$MON" '[.. | objects | select(has("SubscriptionArn") and any(.MonitorArnList[]; . == $m)) | .SubscriptionArn] | unique | .[]' "$B/mgmt-anomaly-subscriptions.json")
+   terraform -chdir=guardrails init
+   terraform -chdir=guardrails import aws_ce_anomaly_monitor.services "$MON"
+   terraform -chdir=guardrails import aws_ce_anomaly_subscription.daily "$SUB"
+   ```
+
+   Set `anomaly_monitor_name` and `anomaly_subscription_name` in
+   `terraform.tfvars` to the imported names (`Default-Services-Monitor`,
+   `Default-Services-Subscription`): the API cannot rename a subscription in
+   place, and a new name would replace it. The apply then changes the
+   subscription in place to the engineer's address, daily, $10 total impact
+   (it was the AWS default: the account root address, $100 and 40 %).
+
+4. **Apply and check.**
+
+   ```bash
+   terraform -chdir=guardrails plan    # only creates, plus the in-place monitor/subscription update
+   terraform -chdir=guardrails apply
+   terraform -chdir=guardrails plan    # No changes.
+   bash tests/FND-4.sh
+   ```
+
+   `tests/FND-4.sh` prints one PASS, FAIL or MANUAL line for AC1 to AC14, then
+   `REG-TC68` to `REG-TC72`. AC7 waits up to 30 minutes for the test bucket's
+   events; AC8 is MANUAL until the trail has logged for two hours, so rerun it
+   then. Also rerun `bash tests/FND-3.sh`: no line that passed in the FND-3 PR
+   may now fail.
+
+### Posture switch
+
+Set `posture = "working"` in `guardrails/terraform.tfvars` (or
+`-var posture=working`). `terraform plan` shows only the budget's
+`limit_amount` changing from `100.00` to `300.00`, in place. Set it back to
+`"lean"` (or remove the line) and apply to return to $100. Only the lowercase
+values `lean` and `working` are accepted.
+
+### Test budget alert (AC3, owner)
+
+Run it when month-to-date spend is above $0.00 (otherwise the alert cannot
+fire; wait until it is):
+
+```bash
+export AWS_PROFILE=fnd-management-admin
+aws ce get-cost-and-usage --granularity MONTHLY --metrics UnblendedCost \
+  --time-period "Start=$(date -u +%Y-%m-01),End=$(date -u -v+1d +%Y-%m-%d)"
+terraform -chdir=guardrails apply -var budget_limit_override_usd=0.01
+# wait for the budget alert email (up to 24 hours), then:
+terraform -chdir=guardrails apply        # override back to null: limit is $100 again
+terraform -chdir=guardrails plan         # No changes.
+```
+
+Put a screenshot of the email (address hidden) in the PR. Never leave the
+override set: `tests/FND-4.sh` fails AC3 while the live limit is $0.01.
+
 ## Recovery
 
 If Identity Center or a permission set breaks and the portal or the
@@ -593,3 +750,104 @@ Cross-check with the credential report (`aws iam generate-credential-report`,
 then `aws iam get-credential-report --query Content --output text | base64 --decode`):
 its `access_key_N_last_used_date` and `access_key_N_last_used_service`
 columns must agree with the table.
+
+## Offers Platform existing setup (FND-4)
+
+What the Offers Platform account already had before the organization trail
+was created (story requirement 7), from the step 1 baseline of
+[Guardrails](#guardrails-fnd-4) taken on 2026-11-22, and what was done with
+each item. Same redaction rule as the IAM inventory: names, settings and the
+action taken only; no account IDs, ARNs, bucket names or email addresses.
+
+| Kind | Name | Settings | What was done |
+|------|------|----------|---------------|
+| Trails (all 17 enabled regions) | none found | No trail of its own in any region | Nothing to remove; nothing copied to `legacy/` |
+| Budget | `csa-project-monthly` | Monthly cost budget, $50, unblended | Kept, unchanged (requirement 7) |
+| Anomaly monitor | `Default-Services-Monitor` | AWS default per-service (`DIMENSIONAL`/`SERVICE`) monitor, with its daily subscription `Default-Services-Subscription` ($100 and 40 % impact, to the account root address) | Kept, unchanged (requirement 7); free |
+
+No Offers Platform trail was kept, so none adds to the monthly cost. The
+organization trail now records Offers Platform's management events in the
+management account's trail bucket.
+
+### Removing a duplicate trail (story decision Q3)
+
+Not needed today (no trail found). If a later baseline finds an Offers
+Platform trail that records only management events (no data, Insights or
+network-activity selectors) and has no CloudWatch Logs or SNS destination, it
+is removed by hand, not in Terraform, in this order, and only after the
+organization trail is logging (`tests/FND-4.sh` AC6 passes). Any other trail
+is kept and listed in the table above with its monthly cost.
+
+```bash
+export OP=fnd-offers-platform-admin M=fnd-management-admin
+OP_TRAIL_ARN=<old-trail-arn>                # from the baseline op-trails.json
+OP_TRAIL_NAME=<old-trail-name>
+OLD_BUCKET=<old-trail-bucket>               # its S3BucketName
+OLD_PREFIX=<old-trail-prefix>               # its S3KeyPrefix plus "/", or empty
+OPID=<offers-platform-account-id>
+TRAIL_BUCKET=aws-foundations-cloudtrail-lakshmi100
+```
+
+**1. Check nothing reads its bucket** (Offers Platform administrator). Any
+hit (notifications, EventBridge, replication, an access point, a reader other
+than CloudTrail and the account itself, a Glue or Athena table on the bucket):
+keep the trail and list it above.
+
+```bash
+aws --profile $OP s3api get-bucket-notification-configuration --bucket "$OLD_BUCKET"   # S3 and EventBridge
+aws --profile $OP s3api get-bucket-replication --bucket "$OLD_BUCKET"                  # ReplicationConfigurationNotFoundError is good
+aws --profile $OP s3control list-access-points --account-id "$OPID" --bucket "$OLD_BUCKET"
+aws --profile $OP s3api get-bucket-policy --bucket "$OLD_BUCKET" --query Policy --output text | jq .
+aws --profile $OP s3api get-bucket-acl --bucket "$OLD_BUCKET"
+for db in $(aws --profile $OP glue get-databases --query 'DatabaseList[].Name' --output text); do
+  aws --profile $OP glue get-tables --database-name "$db" \
+    --query "TableList[?contains(StorageDescriptor.Location, '$OLD_BUCKET')].Name"
+done
+aws --profile $OP athena list-data-catalogs   # only if Athena is used: check list-table-metadata for the bucket too
+```
+
+**2. Copy its logs into the organization trail bucket** under
+`legacy/offers-platform-account-trail/`, keeping the key structure, log files
+and digest files. Download with `fnd-offers-platform-admin`, upload with
+`fnd-management-admin`; no cross-account bucket policy is needed. Every copied
+object is tagged `source=offers-platform-account-trail`. The copies follow the
+trail bucket's lifecycle and are deleted 90 days after the copy.
+
+```bash
+TMP=$(mktemp -d)   # outside the repo
+for d in CloudTrail CloudTrail-Digest; do
+  aws --profile $OP s3 sync "s3://$OLD_BUCKET/${OLD_PREFIX}AWSLogs/$OPID/$d/" "$TMP/${OLD_PREFIX}AWSLogs/$OPID/$d/"
+done
+(cd "$TMP" && find . -type f | sed 's#^\./##') | while read -r k; do
+  aws --profile $M s3api put-object --bucket "$TRAIL_BUCKET" \
+    --key "legacy/offers-platform-account-trail/$k" --body "$TMP/$k" \
+    --tagging 'source=offers-platform-account-trail' >/dev/null
+done
+rm -rf "$TMP"
+```
+
+**3. Check the copy:** the key sets match, and the log and digest counts are
+equal by type. If anything differs, stop: do not delete the trail.
+
+```bash
+src() { aws --profile $OP s3api list-objects-v2 --bucket "$OLD_BUCKET" --prefix "${OLD_PREFIX}AWSLogs/$OPID/" --query 'Contents[].Key' --output json | jq -r '.[]?' | grep -E '/CloudTrail(-Digest)?/' | sort; }
+dst() { aws --profile $M s3api list-objects-v2 --bucket "$TRAIL_BUCKET" --prefix "legacy/offers-platform-account-trail/" --query 'Contents[].Key' --output json | jq -r '.[]?' | sed 's#^legacy/offers-platform-account-trail/##' | sort; }
+diff <(src) <(dst) && echo "key sets match"
+echo "count: logs $(src | grep -c '/CloudTrail/') digests $(src | grep -c '/CloudTrail-Digest/')"
+```
+
+Then record the copy for `tests/FND-4.sh` (AC11), outside the repo, in
+`${FND4_BASELINE_DIR:-$HOME/.fnd-4-baseline}/legacy-copy.json`: a list of
+`{"trail_name", "source_bucket", "source_prefix", "object_count",
+"log_count", "digest_count", "copied_at"}`, one entry per removed trail.
+
+**4. Delete the trail** (Offers Platform administrator):
+
+```bash
+aws cloudtrail delete-trail --profile $OP --name "$OP_TRAIL_ARN"
+```
+
+Then update the table above: the trail's name, its settings, and "removed".
+
+**5. The old bucket is kept** as it is. Deleting it is a later manual
+decision, outside FND-4.
