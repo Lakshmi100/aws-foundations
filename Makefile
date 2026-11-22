@@ -1,6 +1,6 @@
 # Commands from AGENTS.md. Neither target needs AWS credentials.
 
-ROOTS := bootstrap organization
+ROOTS := bootstrap organization guardrails
 
 .PHONY: test lint
 
