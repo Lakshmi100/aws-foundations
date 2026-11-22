@@ -1,0 +1,4 @@
+{"AnomalySubscriptions":[
+ {"SubscriptionArn":"arn:aws:ce::__MGMT__:anomalysubscription/sub-1","AccountId":"__MGMT__","MonitorArnList":["arn:aws:ce::__MGMT__:anomalymonitor/svc-1"],"Subscribers":[{"Address":"__EMAIL__","Type":"EMAIL","Status":"CONFIRMED"}],"Frequency":"DAILY","SubscriptionName":"aws-foundations-daily-summary","ThresholdExpression":{"Dimensions":{"Key":"ANOMALY_TOTAL_IMPACT_ABSOLUTE","Values":["10"],"MatchOptions":["GREATER_THAN_OR_EQUAL"]}}},
+ {"SubscriptionArn":"arn:aws:ce::__MGMT__:anomalysubscription/sub-2","AccountId":"__MGMT__","MonitorArnList":["arn:aws:ce::__MGMT__:anomalymonitor/custom-1"],"Subscribers":[{"Address":"team@example.com","Type":"EMAIL","Status":"CONFIRMED"}],"Frequency":"WEEKLY","SubscriptionName":"custom-weekly","Threshold":50.0}
+]}

@@ -1,0 +1,4 @@
+{"get-anomaly-subscriptions":{"AnomalySubscriptions":[
+ {"SubscriptionArn":"arn:aws:ce::__MGMT__:anomalysubscription/sub-1","MonitorArnList":["arn:aws:ce::__MGMT__:anomalymonitor/svc-1"],"Subscribers":[{"Address":"old@example.com","Type":"EMAIL","Status":"CONFIRMED"}],"Frequency":"IMMEDIATE","SubscriptionName":"Default-Services-Subscription","Threshold":100.0},
+ {"SubscriptionArn":"arn:aws:ce::__MGMT__:anomalysubscription/sub-2","MonitorArnList":["arn:aws:ce::__MGMT__:anomalymonitor/custom-1"],"Subscribers":[{"Address":"team@example.com","Type":"EMAIL","Status":"PENDING"}],"Frequency":"WEEKLY","SubscriptionName":"custom-weekly","Threshold":50.0}
+]}}

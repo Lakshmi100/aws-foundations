@@ -1,0 +1,6 @@
+Validating log files for trail arn:aws:cloudtrail:us-east-1:__MGMT__:trail/aws-foundations-organization-trail between 2026-11-22T18:00:00Z and 2026-11-22T18:59:59Z
+
+Results requested for 2026-11-22T18:00:00Z to 2026-11-22T18:59:59Z
+No digests found
+
+0/0 digest files valid

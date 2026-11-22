@@ -1,0 +1,8 @@
+{"format_version":"1.2","resource_changes":[
+ {"address":"aws_budgets_budget.organization","mode":"managed","type":"aws_budgets_budget","name":"organization","change":{"actions":["update"],
+  "before":{"name":"aws-foundations-monthly-cost","budget_type":"COST","limit_amount":"100.00","limit_unit":"USD","time_unit":"MONTHLY","notification":[{"threshold":50,"subscriber_email_addresses":["__EMAIL__"]},{"threshold":80,"subscriber_email_addresses":["__EMAIL__"]},{"threshold":100,"subscriber_email_addresses":["__EMAIL__"]}],"tags":{"owner":"Lakshmi100"}},
+  "after":{"name":"aws-foundations-monthly-cost","budget_type":"COST","limit_amount":"300.00","limit_unit":"USD","time_unit":"MONTHLY","notification":[{"threshold":50,"subscriber_email_addresses":["__EMAIL__"]},{"threshold":80,"subscriber_email_addresses":["__EMAIL__"]},{"threshold":100,"subscriber_email_addresses":["__EMAIL__"]}],"tags":{"owner":"Lakshmi100"}},
+  "after_unknown":{"notification":[{},{},{}]}}},
+ {"address":"aws_cloudtrail.organization","mode":"managed","type":"aws_cloudtrail","name":"organization","change":{"actions":["no-op"],"before":{"name":"t"},"after":{"name":"t"},"after_unknown":{}}},
+ {"address":"aws_s3_bucket.trail","mode":"managed","type":"aws_s3_bucket","name":"trail","change":{"actions":["no-op"],"before":{"bucket":"b"},"after":{"bucket":"b"},"after_unknown":{}}}
+]}

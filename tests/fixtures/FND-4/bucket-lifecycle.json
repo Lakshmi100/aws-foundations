@@ -1,0 +1,1 @@
+{"Rules":[{"ID":"expire-logs","Filter":{},"Status":"Enabled","Expiration":{"Days":90},"NoncurrentVersionExpiration":{"NoncurrentDays":30},"AbortIncompleteMultipartUpload":{"DaysAfterInitiation":7}},{"ID":"remove-expired-delete-markers","Filter":{"Prefix":""},"Status":"Enabled","Expiration":{"ExpiredObjectDeleteMarker":true}}]}

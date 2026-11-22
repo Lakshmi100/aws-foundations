@@ -1,0 +1,5 @@
+old-trail/AWSLogs/__OP__/CloudTrail/us-east-1/2026/11/01/__OP___CloudTrail_us-east-1_20261101T0005Z_a1.json.gz
+old-trail/AWSLogs/__OP__/CloudTrail/us-east-1/2026/11/01/__OP___CloudTrail_us-east-1_20261101T0010Z_a2.json.gz
+old-trail/AWSLogs/__OP__/CloudTrail/eu-west-1/2026/11/01/__OP___CloudTrail_eu-west-1_20261101T0005Z_b1.json.gz
+old-trail/AWSLogs/__OP__/CloudTrail-Digest/us-east-1/2026/11/01/__OP___CloudTrail-Digest_us-east-1_old-trail_us-east-1_20261101T0105Z.json.gz
+old-trail/AWSLogs/__OP__/CloudTrail-Digest/eu-west-1/2026/11/01/__OP___CloudTrail-Digest_eu-west-1_old-trail_us-east-1_20261101T0105Z.json.gz
