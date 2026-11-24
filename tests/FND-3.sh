@@ -93,6 +93,8 @@ ROLE_MGMT_ADMIN="" ROLE_ABC_ADMIN="" ROLE_OP_ADMIN="" ROLE_ABC_ENG="" ROLE_OP_EN
 BOUNDARY_ABC="" BOUNDARY_OP=""
 STATE_BUCKET="" BUCKET_POLICY=""
 ROOTS=""
+# The Terraform roots this story owns; tests scope every per-root check to these.
+FND3_ROOTS="bootstrap organization"
 
 # ---------------------------------------------------------------- helpers
 
@@ -393,7 +395,7 @@ discover() {
 
 # Fresh clone of the committed branch, then init and state list in every root (TC54).
 setup_clone() {
-  local branch src root name
+  local branch src name
   src=${FND3_CLONE_SOURCE:-$REPO_DIR}
   branch=$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD 2>>"$ERRLOG") || branch=HEAD
   CLONE="$WORK/clone"
@@ -402,13 +404,7 @@ setup_clone() {
   else
     git clone --quiet --branch "$branch" "$src" "$CLONE" >>"$ERRLOG" 2>&1 || { log "git clone failed"; CLONE=""; return 0; }
   fi
-  ROOTS=""
-  for root in "$CLONE"/*/; do
-    name=$(basename "$root")
-    case "$name" in docs | tests) continue ;; esac
-    ls "$root"*.tf >/dev/null 2>&1 || continue
-    ROOTS="$ROOTS $name"
-  done
+  ROOTS=$(select_roots "$CLONE")
   for name in $ROOTS; do
     tf_root "$name" init -input=false -no-color >>"$ERRLOG" 2>&1
     echo $? >"$WORK/init.$name.rc"
@@ -417,6 +413,26 @@ setup_clone() {
     tf_root "$name" output -json >"$WORK/tfout.$name.json" 2>>"$ERRLOG" || : >"$WORK/tfout.$name.json"
   done
   return 0
+}
+
+# select_roots DIR: the Terraform roots FND-3 owns ($FND3_ROOTS) that exist in
+# DIR, in that order. Roots added by later stories (for example guardrails/,
+# FND-4) are ignored: their own tests/<KEY>.sh checks them.
+select_roots() {
+  local dir=$1 name out=""
+  for name in $FND3_ROOTS; do
+    ls "$dir/$name/"*.tf >/dev/null 2>&1 || continue
+    out="$out $name"
+  done
+  printf '%s' "${out# }"
+}
+
+# missing_roots CASE: one problem line per FND-3 root not found in the clone.
+missing_roots() {
+  local name
+  for name in $FND3_ROOTS; do
+    has_root "$name" || echo "$1 $name root missing"
+  done
 }
 
 # tf_root ROOT ARGS...: terraform in the clone's root, as the management admin.
@@ -913,7 +929,7 @@ check_ac13() {
   if [ -z "$CLONE" ]; then
     echo "TC54 fresh clone failed"
   else
-    has_root bootstrap || echo "TC54 bootstrap root missing"
+    missing_roots TC54
     [ -n "$ROOTS" ] || echo "TC54 no Terraform roots in the clone"
     local name
     for name in $ROOTS; do
@@ -1127,6 +1143,7 @@ check_ac14() {
   tags_eval TC62 "offers_platform-$OAAR" "$j"
 
   # Cross-check with terraform state list (both roots).
+  missing_roots TC62
   if [ -z "$ROOTS" ]; then
     echo "TC62 no Terraform state to cross-check"
     return 0
@@ -1181,6 +1198,7 @@ check_ac16() {
   if [ -z "$CLONE" ] || [ -z "$ROOTS" ]; then
     echo "TC65 no Terraform roots in the clone"
   fi
+  [ -z "$CLONE" ] || missing_roots TC65
   local name rc
   for name in $ROOTS; do
     rc=0

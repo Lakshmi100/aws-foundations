@@ -195,6 +195,30 @@ STUB_TAGS=$GOOD_TAGS
 printf 'aws_kms_alias.x\n' >>"$WORK/state.organization"
 expect_line TC63 "AC14 line, unchecked resource type in state" FAIL AC14 check_ac14
 
+# ------------------------------------------------------------ TC62/TC54 (roots scoped to bootstrap and organization)
+# A root added by a later story (guardrails/, FND-4) is not FND-3's: its
+# resources must not be reported as unchecked taggable resources here.
+FAKE_CLONE="$ST_TMP/fake-clone"
+for d in bootstrap organization guardrails docs tests; do
+  mkdir -p "$FAKE_CLONE/$d"
+  : >"$FAKE_CLONE/$d/main.tf"
+done
+got=$(select_roots "$FAKE_CLONE")
+[ "$got" = "bootstrap organization" ] && ok TC62 "select_roots ignores guardrails, docs and tests -> '$got'" ||
+  ko TC62 "select_roots with guardrails present: got '$got'"
+grep -v '^aws_kms_alias\.' "$WORK/state.organization" >"$WORK/state.organization.tmp" && mv "$WORK/state.organization.tmp" "$WORK/state.organization"
+printf '%s\n' 'aws_budgets_budget.monthly' 'aws_ce_anomaly_monitor.services' 'aws_ce_anomaly_subscription.daily' \
+  'aws_ce_cost_allocation_tag.this["owner"]' 'aws_cloudtrail.org' 'aws_s3_bucket.trail' \
+  'aws_s3_bucket_lifecycle_configuration.trail' >"$WORK/state.guardrails"
+ROOTS=$(select_roots "$FAKE_CLONE")
+expect_line TC62 "AC14 line, guardrails root present in the clone" PASS AC14 check_ac14
+rm -rf "$FAKE_CLONE/organization"
+ROOTS=$(select_roots "$FAKE_CLONE")
+expect_line TC62 "AC14 line, organization root missing (guardrails present)" FAIL AC14 check_ac14
+expect_problems TC54 "organization root missing" missing_roots TC54
+ROOTS="bootstrap organization"
+expect_clean TC54 "both FND-3 roots present" missing_roots TC54
+
 # ------------------------------------------------------------ TC68 (policy lists compared as sets)
 # IAM returns principal and action lists in a different order from call to
 # call; a reordering is not a change, a different member is.
