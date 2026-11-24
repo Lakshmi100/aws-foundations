@@ -1,0 +1,1 @@
+{"describe-budgets":{"Budgets":[{"BudgetName":"offers-v2-monthly","BudgetLimit":{"Amount":"50.0","Unit":"USD"},"TimeUnit":"MONTHLY","BudgetType":"COST","TimePeriod":{"Start":"2025-01-01T00:00:00+00:00","End":"2087-06-15T00:00:00+00:00"},"CalculatedSpend":{"ActualSpend":{"Amount":"1.0","Unit":"USD"}}}]}}

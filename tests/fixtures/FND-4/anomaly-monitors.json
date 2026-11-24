@@ -1,0 +1,4 @@
+{"AnomalyMonitors":[
+ {"MonitorArn":"arn:aws:ce::__MGMT__:anomalymonitor/svc-1","MonitorName":"aws-foundations-services","MonitorType":"DIMENSIONAL","MonitorDimension":"SERVICE","LastEvaluatedDate":"2026-11-21","DimensionalValueCount":12},
+ {"MonitorArn":"arn:aws:ce::__MGMT__:anomalymonitor/custom-1","MonitorName":"some-custom-monitor","MonitorType":"CUSTOM","MonitorSpecification":{"Tags":{"Key":"team","Values":["x"]}},"LastEvaluatedDate":"2026-11-21"}
+]}

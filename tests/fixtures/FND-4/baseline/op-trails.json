@@ -1,0 +1,15 @@
+{"us-east-1":{
+ "describe-trails":{"trailList":[
+  {"Name":"old-trail","S3BucketName":"old-trail-bucket-fixture","S3KeyPrefix":"old-trail","IncludeGlobalServiceEvents":true,"IsMultiRegionTrail":true,"HomeRegion":"us-east-1","TrailARN":"arn:aws:cloudtrail:us-east-1:__OP__:trail/old-trail","LogFileValidationEnabled":true,"HasCustomEventSelectors":false,"HasInsightSelectors":false,"IsOrganizationTrail":false},
+  {"Name":"data-trail","S3BucketName":"data-trail-bucket-fixture","IncludeGlobalServiceEvents":false,"IsMultiRegionTrail":false,"HomeRegion":"us-east-1","TrailARN":"arn:aws:cloudtrail:us-east-1:__OP__:trail/data-trail","LogFileValidationEnabled":false,"HasCustomEventSelectors":true,"HasInsightSelectors":false,"IsOrganizationTrail":false}
+ ]},
+ "trails":[
+  {"TrailARN":"arn:aws:cloudtrail:us-east-1:__OP__:trail/old-trail",
+   "get-event-selectors":{"TrailARN":"arn:aws:cloudtrail:us-east-1:__OP__:trail/old-trail","EventSelectors":[{"ReadWriteType":"All","IncludeManagementEvents":true,"DataResources":[],"ExcludeManagementEventSources":[]}]},
+   "get-insight-selectors":{"TrailARN":"arn:aws:cloudtrail:us-east-1:__OP__:trail/old-trail","InsightSelectors":[]},
+   "get-trail-status":{"IsLogging":true,"StartLoggingTime":"2025-01-01T00:00:00Z"}},
+  {"TrailARN":"arn:aws:cloudtrail:us-east-1:__OP__:trail/data-trail",
+   "get-event-selectors":{"TrailARN":"arn:aws:cloudtrail:us-east-1:__OP__:trail/data-trail","EventSelectors":[{"ReadWriteType":"WriteOnly","IncludeManagementEvents":false,"DataResources":[{"Type":"AWS::S3::Object","Values":["arn:aws:s3:::some-bucket/"]}]}]},
+   "get-insight-selectors":{"TrailARN":"arn:aws:cloudtrail:us-east-1:__OP__:trail/data-trail","InsightSelectors":[]},
+   "get-trail-status":{"IsLogging":true}}
+ ]}}
