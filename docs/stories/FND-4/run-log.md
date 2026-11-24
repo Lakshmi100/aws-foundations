@@ -27,3 +27,14 @@
 2026-11-22T22:00:03Z | review | end | round 1: APPROVED, 0 must-fix, 4 optional suggestions
 2026-11-22T22:00:03Z | deliver | start | push and open PR
 2026-11-22T22:00:03Z | summary | final | story-review rounds 2 (77 NEEDS_INFO -> 81 READY); approval rounds 2 (1 feedback, 1 approved); review loops 0; escalations 1 (TC53 disputed, owner ruled tester fix); pending owner evidence AC3, AC8 rerun after 22:46Z, TC73; elapsed from 2026-11-22T18:07:41Z to 2026-11-22T22:00:03Z (about 4h)
+2026-11-24T20:01:09Z | deliver | finding | AC8 FAIL in owner run: tests/FND-4.sh:1431 calls validate-logs for the org trail without --account-id for the management account (CLI requires it); manual run with --account-id: 2/2 digests, 23/23 logs valid
+2026-11-24T20:21:54Z | deliver | fix | AC8 fixed by tester (038a114), selftest 289 PASS; live re-run started
+2026-11-24T20:47:17Z | deliver | live-check | FND-4.sh: AC8 PASS after fix; AC2/AC3/AC14 FAIL on stale guardrails state lock (Apply, created 2026-11-23T01:32Z, no process running, state unchanged since 2026-11-22T20:47Z)
+2026-11-24T20:47:17Z | deliver | live-check | FND-3.sh: AC14 FAIL (scans guardrails root, no tag checks for its resource types), AC16 FAIL (same stale lock); everything else unchanged
+2026-11-24T20:59:01Z | deliver | fix | owner approved: stale guardrails state lock force-unlocked; tester to scope FND-3.sh to its own roots
+2026-11-24T21:10:57Z | deliver | live-check | FND-4.sh after unlock: 16 PASS, 2 MANUAL, 1 FAIL (AC8 abc_bank: no digest for previous clock hour; digest covering it lands ~:18 past the next hour, run was at ~21:05Z)
+2026-11-24T21:17:05Z | deliver | live-check | FND-3.sh after scope fix: 15 PASS, 4 MANUAL (FND-3 owner checks), 0 FAIL — TC73 regression clean
+2026-11-24T23:23:59Z | tester-fix | start | owner: move AC8 TC31/TC33 window back one hour (- 7200) to avoid digest delivery gap
+2026-11-24T23:26:59Z | tester-fix | end | 9688086: AC8 window -7200, guard 3h; selftest 292 PASS
+2026-11-24T23:26:59Z | live-test | start | FND-4.sh after AC8 window fix
+2026-11-24T23:39:31Z | live-test | end | FND-4.sh: 17 PASS, 2 MANUAL (AC3, AC13), 0 FAIL
