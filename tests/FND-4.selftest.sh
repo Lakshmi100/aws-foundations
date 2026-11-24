@@ -525,6 +525,9 @@ STUB_cloudtrail_validate_logs=$VL_valid
 expect_line TC31 "logging 3 hours: validate-logs valid in all three accounts" PASS AC8 check_ac8
 grep -q "validate-logs .*--account-id $A" "$ST_CALLS" && grep -q "validate-logs .*--account-id $O" "$ST_CALLS" &&
   ok TC31 "validate-logs runs with --account-id for both members" || ko TC31 "member validate-logs calls missing"
+# Revision 3: an organization trail needs --account-id for the management account too.
+grep -q "validate-logs .*--account-id $M" "$ST_CALLS" && ! grep "validate-logs" "$ST_CALLS" | grep -vq -- "--account-id" &&
+  ok TC31 "validate-logs runs with --account-id for the management account" || ko TC31 "management validate-logs call omits --account-id"
 STUB_cloudtrail_validate_logs=$VL_invalid
 expect_line TC33 "AC8 line, a digest file INVALID" FAIL AC8 check_ac8 TC33
 FAKE_NOW=""

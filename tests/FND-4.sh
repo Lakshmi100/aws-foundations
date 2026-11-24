@@ -1421,17 +1421,13 @@ check_ac8() {
   s=$(iso_of "$hs")
   e=$(iso_of $((hs + 3599)))
   for label in management abc_bank offers_platform; do
-    case $label in management) acct="" req=yes ;; abc_bank) acct=$ACCT_ABC req=no ;; *) acct=$ACCT_OP req=no ;; esac
-    if [ $label != management ] && [ -z "$acct" ]; then
+    case $label in management) acct=$ACCT_MGMT req=yes ;; abc_bank) acct=$ACCT_ABC req=no ;; *) acct=$ACCT_OP req=no ;; esac
+    if [ -z "$acct" ]; then
       echo "TC31 $label account ID unknown"
       continue
     fi
     rc=0
-    if [ -z "$acct" ]; then
-      out=$(awsp "$P_MGMT" cloudtrail validate-logs --trail-arn "$TRAIL_ARN" --start-time "$s" --end-time "$e" 2>&1) || rc=$?
-    else
-      out=$(awsp "$P_MGMT" cloudtrail validate-logs --trail-arn "$TRAIL_ARN" --start-time "$s" --end-time "$e" --account-id "$acct" 2>&1) || rc=$?
-    fi
+    out=$(awsp "$P_MGMT" cloudtrail validate-logs --trail-arn "$TRAIL_ARN" --start-time "$s" --end-time "$e" --account-id "$acct" 2>&1) || rc=$?
     printf '%s\n' "$out" >>"$ERRLOG"
     ac8_validate_eval "$out" "$rc" "$label" "$req"
   done
