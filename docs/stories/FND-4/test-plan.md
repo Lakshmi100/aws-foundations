@@ -20,6 +20,13 @@ Written from the story only, independently of the design.
 - Output lines confirmed: one per criterion AC1 to AC14, then `REG-TC68` to
   `REG-TC72` (TC74 unchanged).
 
+**Revision 4 (2026-11-24, owner-approved AC8 fix).** CloudTrail delivers an
+hour's digest file about 18 minutes into the next hour, so validating the
+previous clock hour failed for member accounts on runs early in an hour.
+TC31 now validates the clock hour that ended at least one full hour ago, and
+TC32's guard is 3 hours after `StartLoggingTime`, so the window always lies
+after logging started.
+
 All cases are checks in `tests/FND-4.sh` against the real accounts. The script
 prints one PASS, FAIL or MANUAL line per acceptance criterion; a criterion is
 PASS only when every automated case tagged with it passes, and MANUAL when its
@@ -88,8 +95,8 @@ apply to many cases:
 | TC28 | AC7 | negative | Cleanup: after the run (and on any exit, including errors and interrupt), ABC Bank admin `aws s3api head-bucket` on the test bucket. | 404 / Not Found. A test bucket left behind is FAIL. |
 | TC29 | AC7 | boundary | Events first seen after 30 minutes, or only one of the two events seen. | AC7 prints FAIL with the elapsed time. Exactly 30:00 counts as within. |
 | TC30 | AC6 (req 5) | positive | The script's own read calls (`aws s3api list-buckets`) from the management, ABC Bank and Offers Platform admin profiles; poll the trail bucket under each account's prefix for up to 30 minutes. | A `ListBuckets` event (a read management event) for each of the three accounts. Proves all three accounts and read events are recorded. |
-| TC31 | AC8 | positive | `get-trail-status` `StartLoggingTime` at least 2 hours ago; `aws cloudtrail validate-logs --trail-arn <org trail> --start-time <start of previous hour> --end-time <end of previous hour> --account-id <account id>`, run once for each of the management, ABC Bank and Offers Platform accounts. Revision 3: `--account-id` is required for every account, the management account included, because the CLI rejects `validate-logs` on an organization trail without it. | Exit 0; output reports all digest files and all log files valid, with 0 invalid and 0 missing; at least one digest file and one log file validated. |
-| TC32 | AC8 | boundary | `StartLoggingTime` less than 2 hours ago. | AC8 prints MANUAL "rerun after <time>", not PASS. See Q9. |
+| TC31 | AC8 | positive | `get-trail-status` `StartLoggingTime` at least 3 hours ago; `aws cloudtrail validate-logs --trail-arn <org trail> --start-time <start of the clock hour that ended at least one full hour ago> --end-time <end of that hour> --account-id <account id>`, run once for each of the management, ABC Bank and Offers Platform accounts. Revision 4: the window moved back one hour because the digest for an hour arrives about 18 minutes into the next hour. Revision 3: `--account-id` is required for every account, the management account included, because the CLI rejects `validate-logs` on an organization trail without it. | Exit 0; output reports all digest files and all log files valid, with 0 invalid and 0 missing; at least one digest file and one log file validated. |
+| TC32 | AC8 | boundary | `StartLoggingTime` less than 3 hours ago (Revision 4; was 2 hours). | AC8 prints MANUAL "rerun after <time>", not PASS. See Q9. |
 | TC33 | AC8 | boundary | Stubbed outputs: "0/0 digest files valid"; "1 digest file INVALID"; a log file reported missing. | AC8 prints FAIL. Zero files validated is never PASS. |
 | TC34 | AC9 | positive | Management admin, trail bucket: `get-bucket-versioning`. | `Status: Enabled`. |
 | TC35 | AC9 | positive | `get-public-access-block`; `get-bucket-policy-status`; `get-bucket-acl`; `get-bucket-policy`. | All four public access block settings `true`; `IsPublic: false`; no ACL grant to AllUsers or AuthenticatedUsers; no policy statement allows `Principal: "*"` without a condition limiting it to CloudTrail. |
@@ -145,7 +152,7 @@ Types: positive, negative, boundary, regression.
 | AC5 | Four cost-allocation tags active | TC17, TC18 |
 | AC6 | Organization trail, all regions, validation on, read and write management events, logging | TC19, TC20, TC21, TC22, TC23, TC24, TC25, TC30 |
 | AC7 | ABC Bank test bucket create and delete appear in the trail bucket within 30 minutes; bucket deleted | TC26, TC27, TC28, TC29 |
-| AC8 | `validate-logs` for the previous hour reports valid files | TC31, TC32, TC33 |
+| AC8 | `validate-logs` for the hour that ended at least an hour ago reports valid files | TC31, TC32, TC33 |
 | AC9 | Trail bucket: versioning, public block, encryption, 90-day and 30-day lifecycle (plus delete markers) | TC34, TC35, TC36, TC37, TC38, TC39, TC40 |
 | AC10 | From ABC Bank: trail visible and owned by management; no organization budget there (plus member cannot change trail or bucket) | TC41, TC42, TC43, TC44, TC45, TC46 |
 | AC11 | README lists Offers Platform findings; no management-only trail left there (plus the Nov 22 Q3 removal and copy procedure) | TC47, TC48, TC49, TC50, TC51, TC52, TC53, TC54, TC55, TC56, TC57, TC58, TC59, TC60, TC61 |
@@ -171,7 +178,7 @@ Questions raised by this plan:
 - **Q6: baseline for requirement 7 and the import decision.** Resolved (design feedback round 1, item 4): the implementer takes the read-only snapshot before the `guardrails/` apply, in `${FND4_BASELINE_DIR:-$HOME/.fnd-4-baseline}` outside the repo, with the files named in the notes above. TC14, TC15, TC49, TC50 and TC51 read it; a missing baseline is FAIL.
 - **Q7: how AC3 sets $0.01 "through Terraform".** The plan assumes a temporary variable override (`-var` or an untracked `.tfvars` entry), not a committed code change, so the reset leaves no diff and the plan shows no changes. Is that right?
 - **Q8: who runs AC3, and when.** Resolved (design feedback round 1, conflict 7): AC3 is an owner step; the script only reports MANUAL (TC09, TC10), and TC11 checks the reset.
-- **Q9: AC8 before two hours.** If the script runs less than two hours after logging starts, the plan prints MANUAL "rerun later" rather than FAIL (TC32). Acceptable?
+- **Q9: AC8 before three hours.** If the script runs less than three hours (Revision 4; was two) after logging starts, the plan prints MANUAL "rerun later" rather than FAIL (TC32). Acceptable?
 - **Q10: posture values.** Resolved (design feedback round 1, item 3): the values are lowercase `lean` and `working`; anything else, including `Heavy`, an empty string and `Working`, is rejected by the variable (TC08).
 - **Q11: "read and write management events".** Does excluding management event sources (for example KMS or RDS Data API events, often excluded to cut volume) still meet AC6? The plan assumes no exclusions (TC20).
 - **Q12: AC10 "no organization budget" in ABC Bank.** ABC Bank stories may later add budgets of their own. The plan checks only that no budget with the organization budget's name or definition exists there (TC42). Is that the intended reading?

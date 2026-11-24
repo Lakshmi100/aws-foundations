@@ -517,12 +517,21 @@ expect_problems TC31 "validate-logs exit 1" ac8_validate_eval "$VL_valid" 1 mana
 printf '%s' "$TS" | jx --arg s "$(iso_of $((T0 - 3600)))" '.StartLoggingTime = $s' >"$WORK/trail-status.json"
 FAKE_NOW=$T0
 TRAIL_ARN="arn:aws:cloudtrail:us-east-1:$M:trail/aws-foundations-organization-trail"
-expect_line TC32 "logging started 1 hour ago: MANUAL rerun after" MANUAL AC8 check_ac8 "rerun after $(iso_of $((T0 + 3600)))"
-printf '%s' "$TS" | jx --arg s "$(iso_of $((T0 - 7199)))" '.StartLoggingTime = $s' >"$WORK/trail-status.json"
-expect_line TC32 "logging started 1:59:59 ago: still MANUAL" MANUAL AC8 check_ac8 "rerun after"
+expect_line TC32 "logging started 1 hour ago: MANUAL rerun after" MANUAL AC8 check_ac8 "rerun after $(iso_of $((T0 + 7200)))"
+printf '%s' "$TS" | jx --arg s "$(iso_of $((T0 - 7200)))" '.StartLoggingTime = $s' >"$WORK/trail-status.json"
+expect_line TC32 "logging started 2 hours ago: still MANUAL (Revision 4 guard is 3 hours)" MANUAL AC8 check_ac8 "less than 3 hours ago"
+printf '%s' "$TS" | jx --arg s "$(iso_of $((T0 - 10799)))" '.StartLoggingTime = $s' >"$WORK/trail-status.json"
+expect_line TC32 "logging started 2:59:59 ago: still MANUAL" MANUAL AC8 check_ac8 "rerun after"
 printf '%s' "$TS" | jx --arg s "$(iso_of $((T0 - 10800)))" '.StartLoggingTime = $s' >"$WORK/trail-status.json"
 STUB_cloudtrail_validate_logs=$VL_valid
+: >"$ST_CALLS"
 expect_line TC31 "logging 3 hours: validate-logs valid in all three accounts" PASS AC8 check_ac8
+# Revision 4: the window is the clock hour that ended at least one full hour ago
+# (digest delivery lag), and it starts at or after StartLoggingTime.
+VL_HS=$(((T0 / 3600) * 3600 - 7200))
+[ "$(grep -c -- "validate-logs .*--start-time $(iso_of "$VL_HS") --end-time $(iso_of $((VL_HS + 3599)))" "$ST_CALLS")" = 3 ] &&
+  ok TC31 "validate-logs window is the hour that ended at least an hour ago" || ko TC31 "validate-logs window is not the hour ending at least an hour ago"
+[ "$VL_HS" -ge $((T0 - 10800)) ] && ok TC32 "window starts after StartLoggingTime at the 3-hour guard" || ko TC32 "window starts before StartLoggingTime"
 grep -q "validate-logs .*--account-id $A" "$ST_CALLS" && grep -q "validate-logs .*--account-id $O" "$ST_CALLS" &&
   ok TC31 "validate-logs runs with --account-id for both members" || ko TC31 "member validate-logs calls missing"
 # Revision 3: an organization trail needs --account-id for the management account too.

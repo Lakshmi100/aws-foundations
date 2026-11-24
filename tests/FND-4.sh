@@ -1413,11 +1413,13 @@ check_ac8() {
   start=$(jqq -r "$JQ_LIB"'.StartLoggingTime // null | to_epoch // empty' "$WORK/trail-status.json" 2>/dev/null || true)
   [ -n "$start" ] || { echo "TC31 StartLoggingTime unknown"; return 0; }
   now=$(now_epoch)
-  if [ $((now - start)) -lt 7200 ]; then
-    echo "@MANUAL the trail started logging less than 2 hours ago: rerun after $(iso_of $((start + 7200))) (TC32)"
+  if [ $((now - start)) -lt 10800 ]; then
+    echo "@MANUAL the trail started logging less than 3 hours ago: rerun after $(iso_of $((start + 10800))) (TC32)"
     return 0
   fi
-  hs=$(((now / 3600) * 3600 - 3600))
+  # The clock hour that ended at least one full hour ago: CloudTrail delivers
+  # an hour's digest about 18 minutes into the next hour.
+  hs=$(((now / 3600) * 3600 - 7200))
   s=$(iso_of "$hs")
   e=$(iso_of $((hs + 3599)))
   for label in management abc_bank offers_platform; do
@@ -2110,7 +2112,7 @@ main() {
   run_check AC5 check_ac5 "data-product, environment, owner and cost-center are Active cost-allocation tags"
   run_check AC6 check_ac6 "one organization trail: all regions, validation on, read and write management events, logging; reads recorded in all three accounts"
   run_check AC7 check_ac7 "ABC Bank CreateBucket and DeleteBucket by the administrator role in the trail bucket within 30:00; test bucket gone"
-  run_check AC8 check_ac8 "validate-logs for the previous hour: all digest and log files valid in all three accounts"
+  run_check AC8 check_ac8 "validate-logs for the hour that ended at least an hour ago: all digest and log files valid in all three accounts"
   run_check AC9 check_ac9 "trail bucket: versioned, private, SSE-S3, 90-day and 30-day lifecycle, delete markers cleaned, us-east-1, management-owned"
   run_check AC10 check_ac10 "members see the management-owned trail, hold no organization budget, and cannot change the trail or bucket"
   run_check AC11 check_ac11 "Offers Platform findings in README; no management-only trail left; legacy copy complete and tagged (or not applicable)"
