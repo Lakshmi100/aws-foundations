@@ -38,3 +38,4 @@
 2026-11-24T23:26:59Z | tester-fix | end | 9688086: AC8 window -7200, guard 3h; selftest 292 PASS
 2026-11-24T23:26:59Z | live-test | start | FND-4.sh after AC8 window fix
 2026-11-24T23:39:31Z | live-test | end | FND-4.sh: 17 PASS, 2 MANUAL (AC3, AC13), 0 FAIL
+2026-11-24T23:39:55Z | deliver | update | pushed 038a114..03b3f3a; PR #6 body updated with FND-4.sh 17 PASS/2 MANUAL and FND-3.sh 15 PASS/4 MANUAL
